@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+.hf_cache/
+downloaded_models/
+
+.venv/
+.env
