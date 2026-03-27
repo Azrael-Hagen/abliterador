@@ -61,6 +61,7 @@ class ModelSearcher(QWidget):
         self._pending_generate_after_load = False
         self._last_failed_operation = ""
         self._last_failed_model = ""
+        self._prefer_real_abliteration = True
 
         self.worker_thread = QThread(self)
         self.worker = ModelTaskWorker()
@@ -94,6 +95,7 @@ class ModelSearcher(QWidget):
 
         self._build_workflow_tab()
         self._build_catalog_tab()
+        self._build_model_chat_tab()
         self._build_assistant_tab()
         self._build_output_tab()
 
@@ -150,6 +152,10 @@ class ModelSearcher(QWidget):
         self.backend_selector.addItem("Ollama", BACKEND_MODE_OLLAMA)
         self.backend_selector.addItem("Fallback", BACKEND_MODE_FALLBACK)
         backend_layout.addWidget(self.backend_selector)
+
+        self.prefer_real_abliteration_chk = QCheckBox("Preferir abliteracion real")
+        self.prefer_real_abliteration_chk.setChecked(True)
+        backend_layout.addWidget(self.prefer_real_abliteration_chk)
 
         self.reload_ollama_button = QPushButton("Actualizar modelos locales")
         self.reload_ollama_button.setIcon(self.style().standardIcon(QStyle.SP_BrowserReload))
@@ -304,6 +310,58 @@ class ModelSearcher(QWidget):
 
         self.main_tabs.addTab(self.tab_catalog, "Catalogo")
 
+    def _build_model_chat_tab(self):
+        self.tab_model_chat = QWidget()
+        layout = QVBoxLayout(self.tab_model_chat)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(8)
+
+        chat_context_box = QGroupBox("Contexto del chat")
+        chat_context_layout = QHBoxLayout(chat_context_box)
+        self.chat_model_chip = QLabel("Modelo activo: sin cargar")
+        self.chat_model_chip.setObjectName("outputMetaChip")
+        chat_context_layout.addWidget(self.chat_model_chip)
+
+        self.chat_backend_chip = QLabel("Backend: auto")
+        self.chat_backend_chip.setObjectName("outputMetaChip")
+        chat_context_layout.addWidget(self.chat_backend_chip)
+        chat_context_layout.addStretch(1)
+        layout.addWidget(chat_context_box)
+
+        model_chat_box = QGroupBox("Conversación con modelo")
+        model_chat_layout = QVBoxLayout(model_chat_box)
+
+        model_chat_actions = QHBoxLayout()
+        self.model_chat_clear_button = QPushButton("Limpiar chat modelo")
+        self.model_chat_clear_button.clicked.connect(self._clear_model_chat)
+        model_chat_actions.addWidget(self.model_chat_clear_button)
+
+        self.model_chat_copy_button = QPushButton("Copiar chat modelo")
+        self.model_chat_copy_button.clicked.connect(self._copy_model_chat)
+        model_chat_actions.addWidget(self.model_chat_copy_button)
+        model_chat_actions.addStretch(1)
+        model_chat_layout.addLayout(model_chat_actions)
+
+        self.model_chat_output = QTextEdit()
+        self.model_chat_output.setReadOnly(True)
+        self.model_chat_output.setObjectName("modelChatOutput")
+        self.model_chat_output.setPlaceholderText("Aquí aparecerán exclusivamente tus mensajes y respuestas del modelo.")
+        model_chat_layout.addWidget(self.model_chat_output)
+
+        model_chat_input_row = QHBoxLayout()
+        self.model_chat_input = QLineEdit()
+        self.model_chat_input.setPlaceholderText("Escribe un mensaje al modelo y presiona Enter...")
+        self.model_chat_input.returnPressed.connect(self._model_chat_send)
+        model_chat_input_row.addWidget(self.model_chat_input)
+
+        self.model_chat_send_button = QPushButton("Enviar al modelo")
+        self.model_chat_send_button.clicked.connect(self._model_chat_send)
+        model_chat_input_row.addWidget(self.model_chat_send_button)
+        model_chat_layout.addLayout(model_chat_input_row)
+
+        layout.addWidget(model_chat_box, 1)
+        self.main_tabs.addTab(self.tab_model_chat, "Chat Modelo")
+
     def _build_assistant_tab(self):
         self.tab_assistant = QWidget()
         layout = QVBoxLayout(self.tab_assistant)
@@ -384,7 +442,7 @@ class ModelSearcher(QWidget):
         hero_title.setObjectName("outputHeroTitle")
         hero_layout.addWidget(hero_title)
 
-        hero_subtitle = QLabel("Actividad técnica del flujo: progreso, diagnósticos, errores y eventos del backend. El chat vive en la pestaña Asistente.")
+        hero_subtitle = QLabel("Actividad técnica del flujo: progreso, diagnósticos, errores y eventos del backend. El chat vive en la pestaña Chat Modelo.")
         hero_subtitle.setObjectName("outputHeroSubtitle")
         hero_subtitle.setWordWrap(True)
         hero_layout.addWidget(hero_subtitle)
@@ -564,7 +622,7 @@ class ModelSearcher(QWidget):
                 padding: 3px 8px;
                 color: #ffd493;
             }
-            #assistantOutput, #outputFeed, #abliterationInfoLabel {
+            #assistantOutput, #outputFeed, #abliterationInfoLabel, #modelChatOutput {
                 background: #0b1015;
                 border: 1px solid #26313c;
                 border-radius: 14px;
@@ -694,6 +752,34 @@ class ModelSearcher(QWidget):
         QApplication.clipboard().setText(text)
         self.status_label.setText("Salida copiada al portapapeles.")
 
+    def _clear_model_chat(self):
+        self.model_chat_output.clear()
+
+    def _copy_model_chat(self):
+        text = self.model_chat_output.toPlainText().strip()
+        if not text:
+            self.status_label.setText("No hay chat del modelo para copiar.")
+            return
+        QApplication.clipboard().setText(text)
+        self.status_label.setText("Chat del modelo copiado al portapapeles.")
+
+    def _model_chat_append(self, speaker: str, text: str, tone: str):
+        self._append_feed(self.model_chat_output, speaker, text, tone)
+
+    def _update_chat_context_meta(self, model: str | None = None, backend: str | None = None):
+        if model is not None:
+            shown_model = model if len(model) <= 42 else f"{model[:39]}..."
+            self.chat_model_chip.setText(f"Modelo activo: {shown_model}")
+        if backend is not None:
+            self.chat_backend_chip.setText(f"Backend: {backend}")
+
+    def _model_chat_send(self):
+        prompt = self.model_chat_input.text().strip()
+        if not prompt:
+            return
+        self.model_chat_input.clear()
+        self.generate_text(prompt_override=prompt)
+
     def _update_output_meta(self, state: str | None = None, model: str | None = None, backend: str | None = None):
         if model is not None:
             shown_model = model if len(model) <= 42 else f"{model[:39]}..."
@@ -776,6 +862,10 @@ class ModelSearcher(QWidget):
         self.assistant_recommend_button.setEnabled(not busy)
         self.assistant_next_button.setEnabled(not busy)
         self.assistant_repair_button.setEnabled(not busy)
+        self.model_chat_clear_button.setEnabled(not busy)
+        self.model_chat_copy_button.setEnabled(not busy)
+        self.model_chat_send_button.setEnabled(not busy)
+        self.model_chat_input.setEnabled(not busy)
         self.output_copy_button.setEnabled(not busy)
         self.output_jump_button.setEnabled(True)
         for button in self._catalog_card_buttons:
@@ -949,9 +1039,12 @@ class ModelSearcher(QWidget):
         if self.main_tabs.currentWidget() == self.tab_catalog:
             return self._catalog_selected_model_name()
         selected = self.results_list.currentItem()
-        if selected is None:
-            return None
-        return selected.text().strip()
+        if selected is not None:
+            return selected.text().strip()
+        if self.current_model_name:
+            return self.current_model_name
+        typed = self.search_input.text().strip()
+        return typed or None
 
     def _assistant_context(self) -> dict:
         top_recommended = [model.display_name for model, reason in self._catalog_recommendations if reason.startswith("✅")]
@@ -964,6 +1057,15 @@ class ModelSearcher(QWidget):
             "model_ready": self.model_ready,
             "top_recommended": top_recommended,
         }
+
+    def _pick_preferred_hf_model_name(self) -> str | None:
+        for model, reason in self._catalog_recommendations:
+            if model.source == SOURCE_HUGGINGFACE and reason.startswith("✅"):
+                return model.name
+        for model, _reason in self._catalog_recommendations:
+            if model.source == SOURCE_HUGGINGFACE:
+                return model.name
+        return None
 
     def _assistant_append(self, text: str):
         self._append_feed(self.assistant_output, "Asistente", text, "assistant")
@@ -995,9 +1097,25 @@ class ModelSearcher(QWidget):
             self.task_requested.emit(WorkerTask(operation="auto_repair", model_name="huggingface"))
             return True
 
+        if "permissionerror" in low or "cache directory permissions" in low or "lock needs manual removal" in low:
+            self._assistant_append(
+                "Detecté bloqueo/permisos en caché de Hugging Face. Limpio locks, reparo entorno y reintento."
+            )
+            self._set_busy(True)
+            self.main_tabs.setCurrentWidget(self.tab_output)
+            self.task_requested.emit(WorkerTask(operation="auto_repair", model_name="huggingface"))
+            return True
+
         if "ollama no está instalado" in low or "ollama no esta" in low:
             self._assistant_append("Detecté error de Ollama. Cambio backend a Fallback para continuar.")
             self.backend_selector.setCurrentIndex(self.backend_selector.findData(BACKEND_MODE_FALLBACK))
+            return True
+
+        if "backend heretic" in low or "heretic" in low:
+            self._assistant_append("Detecté error de Heretic. Intento auto-reparación del entorno y reintento.")
+            self._set_busy(True)
+            self.main_tabs.setCurrentWidget(self.tab_output)
+            self.task_requested.emit(WorkerTask(operation="auto_repair", model_name="heretic"))
             return True
 
         return False
@@ -1090,7 +1208,30 @@ class ModelSearcher(QWidget):
             QMessageBox.warning(self, "Error", "Selecciona un modelo.")
             return
 
+        self._last_failed_operation = "load_abliterate"
+        self._last_failed_model = model_name
+
         selected_mode = self._selected_backend_mode()
+
+        if self.prefer_real_abliteration_chk.isChecked() and selected_mode in {BACKEND_MODE_AUTO, BACKEND_MODE_OLLAMA}:
+            if ":" in model_name:
+                preferred_hf = self._pick_preferred_hf_model_name()
+                if preferred_hf:
+                    self._assistant_append(
+                        "Preferencia de abliteración real activa: cambio a Heretic usando un modelo HF recomendado."
+                    )
+                    self._append_output(
+                        f"Preferencia de abliteración real: se usará Heretic con {preferred_hf} en lugar de {model_name}."
+                    )
+                    self._select_workflow_item_by_name(preferred_hf)
+                    self.backend_selector.setCurrentIndex(self.backend_selector.findData(BACKEND_MODE_HERETIC))
+                    model_name = preferred_hf
+                    selected_mode = BACKEND_MODE_HERETIC
+                else:
+                    self._assistant_append(
+                        "No encontré modelos HF en el catálogo para abliteración real; continúo con el backend seleccionado."
+                    )
+
         if selected_mode == BACKEND_MODE_HERETIC and ":" in model_name:
             answer = QMessageBox.question(
                 self,
@@ -1110,18 +1251,18 @@ class ModelSearcher(QWidget):
         settings = self._build_settings()
         self._set_busy(True)
         self.main_tabs.setCurrentWidget(self.tab_output)
-        self._update_output_meta(state="cargando modelo", model=model_name, backend=self._selected_backend_mode())
+        self._update_output_meta(state="cargando modelo", model=model_name, backend=selected_mode)
         self.task_requested.emit(
             WorkerTask(
                 operation="load_abliterate",
                 model_name=model_name,
                 prompt=prompt,
                 settings=settings,
-                preferred_backend=self._selected_backend_mode(),
+                preferred_backend=selected_mode,
             )
         )
 
-    def generate_text(self):
+    def generate_text(self, prompt_override: str | None = None):
         if not self.model_ready:
             if self._assistant_autopilot_enabled:
                 selected = self._current_selected_model_name()
@@ -1133,15 +1274,15 @@ class ModelSearcher(QWidget):
             QMessageBox.warning(self, "Error", "Primero carga y ablitera un modelo.")
             return
 
-        prompt = self.prompt_input.toPlainText().strip()
+        prompt = (prompt_override or "").strip() or self.prompt_input.toPlainText().strip()
         if not prompt:
             QMessageBox.warning(self, "Error", "Introduce un prompt para generar texto.")
             return
 
         settings = self._build_settings()
         self._set_busy(True)
-        self.main_tabs.setCurrentWidget(self.tab_output)
-        self._append_feed(self.assistant_output, "Tu", prompt, "user")
+        self.main_tabs.setCurrentWidget(self.tab_model_chat)
+        self._model_chat_append("Tu", prompt, "user")
         self._update_output_meta(state="generando", backend=self._selected_backend_mode())
         self.task_requested.emit(
             WorkerTask(
@@ -1164,12 +1305,13 @@ class ModelSearcher(QWidget):
             self.model_ready = True
             self.current_model_name = model_name
             self._update_output_meta(state="modelo listo", model=model_name, backend=backend)
+            self._update_chat_context_meta(model=model_name, backend=backend)
             self._append_output(f"Modelo listo para pruebas: {model_name}")
             self._append_output(f"Backend: {backend}")
             self.refresh_extensions_status()
             self._assistant_append("Modelo cargado. Ya puedes generar texto.")
             if output:
-                self._append_feed(self.assistant_output, "Modelo", output, "model")
+                self._model_chat_append("Modelo", output, "model")
                 output = ""
             if self._pending_generate_after_load:
                 self._pending_generate_after_load = False
@@ -1179,8 +1321,9 @@ class ModelSearcher(QWidget):
 
         if operation == "generate":
             self._update_output_meta(state="respuesta lista", model=model_name, backend=backend)
+            self._update_chat_context_meta(model=model_name, backend=backend)
             if output:
-                self._append_feed(self.assistant_output, "Modelo", output, "model")
+                self._model_chat_append("Modelo", output, "model")
                 output = ""
 
         if operation == "search_downloadable":
@@ -1218,6 +1361,10 @@ class ModelSearcher(QWidget):
             self._last_failed_operation = ""
             self._last_failed_model = ""
 
+        if operation == "load_abliterate":
+            self._last_failed_operation = ""
+            self._last_failed_model = ""
+
         if operation == "auto_repair":
             self._update_output_meta(state="entorno reparado")
             self._append_output(payload.get("output", "Auto-reparación completada."))
@@ -1228,6 +1375,10 @@ class ModelSearcher(QWidget):
                 self.task_requested.emit(
                     WorkerTask(operation="download_model", model_name=self._last_failed_model)
                 )
+                return
+            if self._last_failed_operation == "load_abliterate":
+                self._append_output("Reintentando carga y abliteración...")
+                self.apply_heretic()
                 return
 
         if output:

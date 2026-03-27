@@ -1,3 +1,5 @@
+import os
+import shutil
 import subprocess
 import sys
 from typing import Callable
@@ -24,6 +26,10 @@ def _module_exists(module_name: str) -> bool:
         return False
 
 
+def _has_heretic_module() -> bool:
+    return _module_exists("heretic") or _module_exists("heretic_llm")
+
+
 def _pip_install(package_name: str, progress_callback: Callable[[str], None] | None = None) -> bool:
     _emit(progress_callback, f"Instalando paquete: {package_name}...")
     try:
@@ -46,6 +52,49 @@ def _pip_install(package_name: str, progress_callback: Callable[[str], None] | N
         return False
 
 
+def _cleanup_lockfiles(base_dir: str, progress_callback: Callable[[str], None] | None = None) -> int:
+    if not base_dir or not os.path.isdir(base_dir):
+        return 0
+
+    removed = 0
+    for root, dirs, files in os.walk(base_dir):
+        for filename in files:
+            if filename.endswith(".lock"):
+                lock_path = os.path.join(root, filename)
+                try:
+                    os.remove(lock_path)
+                    removed += 1
+                except Exception:
+                    pass
+        for dirname in list(dirs):
+            if dirname.endswith(".lock"):
+                lock_dir = os.path.join(root, dirname)
+                try:
+                    shutil.rmtree(lock_dir, ignore_errors=True)
+                    removed += 1
+                except Exception:
+                    pass
+
+    if removed:
+        _emit(progress_callback, f"Locks eliminados en {base_dir}: {removed}")
+    return removed
+
+
+def _prepare_local_hf_cache(progress_callback: Callable[[str], None] | None = None) -> str:
+    cache_dir = os.path.join(os.getcwd(), ".hf_cache")
+    hub_dir = os.path.join(cache_dir, "hub")
+    transformers_dir = os.path.join(cache_dir, "transformers")
+
+    os.makedirs(hub_dir, exist_ok=True)
+    os.makedirs(transformers_dir, exist_ok=True)
+
+    os.environ["HF_HOME"] = cache_dir
+    os.environ["HUGGINGFACE_HUB_CACHE"] = hub_dir
+    os.environ["TRANSFORMERS_CACHE"] = transformers_dir
+    _emit(progress_callback, f"Cache local de Hugging Face preparado: {cache_dir}")
+    return cache_dir
+
+
 def attempt_auto_repair(target: str, progress_callback: Callable[[str], None] | None = None) -> dict:
     """
     Intenta reparar problemas comunes del entorno y devuelve resultado estructurado.
@@ -54,6 +103,11 @@ def attempt_auto_repair(target: str, progress_callback: Callable[[str], None] | 
     _emit(progress_callback, f"Auto-reparacion iniciada para: {target}")
 
     if target in {"huggingface", "hf", "download"}:
+        local_cache = _prepare_local_hf_cache(progress_callback)
+        user_cache = os.path.join(os.path.expanduser("~"), ".cache", "huggingface", "hub")
+        _cleanup_lockfiles(local_cache, progress_callback)
+        _cleanup_lockfiles(user_cache, progress_callback)
+
         cli_ok = _command_exists("huggingface-cli")
         hub_ok = _module_exists("huggingface_hub")
 
@@ -100,9 +154,53 @@ def attempt_auto_repair(target: str, progress_callback: Callable[[str], None] | 
             "message": "Ollama no esta disponible en el PATH del sistema.",
         }
 
+    if target in {"heretic", "abliteration", "abliteracion"}:
+        heretic_ok = _has_heretic_module()
+        torch_ok = _module_exists("torch")
+
+        if heretic_ok and torch_ok:
+            msg = "Heretic ya esta listo para usarse."
+            _emit(progress_callback, msg)
+            return {"ok": True, "message": msg}
+
+        if not heretic_ok:
+            _emit(progress_callback, "No se detecta el modulo heretic. Intentando instalar heretic-llm...")
+            if not _pip_install("heretic-llm", progress_callback):
+                return {
+                    "ok": False,
+                    "message": "No se pudo instalar heretic-llm automaticamente.",
+                }
+
+        if not torch_ok:
+            _emit(progress_callback, "No se detecta torch. Intentando instalar torch...")
+            if not _pip_install("torch", progress_callback):
+                return {
+                    "ok": False,
+                    "message": "No se pudo instalar torch automaticamente.",
+                }
+
+        heretic_ok = _has_heretic_module()
+        torch_ok = _module_exists("torch")
+        if heretic_ok and torch_ok:
+            msg = "Reparacion Heretic completada correctamente."
+            _emit(progress_callback, msg)
+            return {"ok": True, "message": msg}
+
+        return {
+            "ok": False,
+            "message": (
+                "Heretic no quedo listo tras la reparacion "
+                f"(heretic={'si' if heretic_ok else 'no'}, torch={'si' if torch_ok else 'no'})."
+            ),
+        }
+
     # Reparacion general minima
     hf_status = attempt_auto_repair("huggingface", progress_callback)
+    heretic_status = attempt_auto_repair("heretic", progress_callback)
     return {
-        "ok": hf_status["ok"],
-        "message": f"Reparacion general finalizada: {hf_status['message']}",
+        "ok": hf_status["ok"] and heretic_status["ok"],
+        "message": (
+            "Reparacion general finalizada: "
+            f"HF=({hf_status['message']}) | Heretic=({heretic_status['message']})"
+        ),
     }

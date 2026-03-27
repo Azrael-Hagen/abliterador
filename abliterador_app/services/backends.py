@@ -1,6 +1,7 @@
 import inspect
 import os
 import re
+import shutil
 import subprocess
 import sys
 from abc import ABC, abstractmethod
@@ -25,6 +26,82 @@ BACKEND_MODE_FALLBACK = "fallback"
 
 class BackendError(RuntimeError):
     pass
+
+
+def _workspace_hf_cache_dir() -> str:
+    cache_dir = os.path.join(os.getcwd(), ".hf_cache")
+    os.makedirs(cache_dir, exist_ok=True)
+    return cache_dir
+
+
+def _configure_hf_environment() -> None:
+    """Force HF/Transformers caches into workspace to avoid user-profile permission issues."""
+    base = _workspace_hf_cache_dir()
+    hub_cache = os.path.join(base, "hub")
+    transformers_cache = os.path.join(base, "transformers")
+    os.makedirs(hub_cache, exist_ok=True)
+    os.makedirs(transformers_cache, exist_ok=True)
+
+    os.environ["HF_HOME"] = base
+    os.environ["HUGGINGFACE_HUB_CACHE"] = hub_cache
+    os.environ["TRANSFORMERS_CACHE"] = transformers_cache
+
+
+def _has_dir_content(path: str) -> bool:
+    try:
+        with os.scandir(path) as iterator:
+            for _ in iterator:
+                return True
+    except Exception:
+        return False
+    return False
+
+
+def _resolve_hf_model_source(model_name: str) -> tuple[str, str, str]:
+    cache_dir, model_dir = _local_hf_paths(model_name)
+    source = model_dir if _has_dir_content(model_dir) else model_name
+    return source, cache_dir, model_dir
+
+
+def _is_permission_or_lock_error(message: str) -> bool:
+    low = (message or "").lower()
+    return any(
+        token in low
+        for token in [
+            "permissionerror",
+            "check cache directory permissions",
+            "access is denied",
+            "winerror 5",
+            "filelock",
+            "lock file",
+            "lock needs manual removal",
+        ]
+    )
+
+
+def _cleanup_hf_locks(cache_dir: str) -> int:
+    removed = 0
+    for root, dirs, files in os.walk(cache_dir):
+        for filename in files:
+            if filename.endswith(".lock"):
+                lock_path = os.path.join(root, filename)
+                try:
+                    os.remove(lock_path)
+                    removed += 1
+                except Exception:
+                    pass
+        for dirname in list(dirs):
+            if dirname.endswith(".lock"):
+                lock_dir = os.path.join(root, dirname)
+                try:
+                    shutil.rmtree(lock_dir, ignore_errors=True)
+                    removed += 1
+                except Exception:
+                    pass
+    return removed
+
+
+_configure_hf_environment()
 
 
 class BaseAbliterationBackend(ABC):
@@ -53,8 +130,9 @@ class TransformersFallbackBackend(BaseAbliterationBackend):
         self.tokenizer = None
 
     def load_and_abliterate(self, model_name: str, prompt: str, settings: GenerationSettings) -> str:
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self.model = AutoModelForCausalLM.from_pretrained(model_name)
+        source, cache_dir, _model_dir = _resolve_hf_model_source(model_name)
+        self.tokenizer = AutoTokenizer.from_pretrained(source, cache_dir=cache_dir)
+        self.model = AutoModelForCausalLM.from_pretrained(source, cache_dir=cache_dir)
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
         return self.generate(prompt, settings)
@@ -98,8 +176,9 @@ class LegacyHereticLLMBackend(BaseAbliterationBackend):
         return {key: value for key, value in kwargs.items() if key in signature.parameters}
 
     def load_and_abliterate(self, model_name: str, prompt: str, settings: GenerationSettings) -> str:
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
-        model = AutoModelForCausalLM.from_pretrained(model_name)
+        source, cache_dir, _model_dir = _resolve_hf_model_source(model_name)
+        tokenizer = AutoTokenizer.from_pretrained(source, cache_dir=cache_dir)
+        model = AutoModelForCausalLM.from_pretrained(source, cache_dir=cache_dir)
         self.heretic = self.heretic_cls(model, tokenizer)
         self.heretic.abliterate()
         return self.generate(prompt, settings)
@@ -145,8 +224,9 @@ class ModernHereticBackend(BaseAbliterationBackend):
         self.model = None
 
     def _build_settings(self, model_name: str, settings: GenerationSettings):
+        source, _cache_dir, _model_dir = _resolve_hf_model_source(model_name)
         return self.settings_cls(
-            model=model_name,
+            model=source,
             max_response_length=max(16, settings.max_new_tokens),
             print_responses=False,
             orthogonalize_direction=True,
@@ -313,7 +393,7 @@ def _safe_repo_path_component(repo_id: str) -> str:
 
 
 def _local_hf_paths(repo_id: str) -> tuple[str, str]:
-    cache_dir = os.path.join(os.getcwd(), ".hf_cache")
+    cache_dir = _workspace_hf_cache_dir()
     model_dir = os.path.join(os.getcwd(), "downloaded_models", _safe_repo_path_component(repo_id))
     os.makedirs(cache_dir, exist_ok=True)
     os.makedirs(model_dir, exist_ok=True)
@@ -450,6 +530,20 @@ def download_model(
         return f"Modelo HF descargado en caché local: {model_name}"
     except Exception as first_exc:
         emit(f"Fallback directo falló: {first_exc}")
+        if _is_permission_or_lock_error(str(first_exc)):
+            removed = _cleanup_hf_locks(cache_dir)
+            emit(f"Detectado problema de permisos/locks. Locks limpiados: {removed}. Reintentando...")
+            try:
+                local_path = snapshot_download(
+                    repo_id=model_name,
+                    resume_download=True,
+                    cache_dir=cache_dir,
+                    local_dir=model_dir,
+                )
+                emit(f"✅ Modelo descargado tras limpiar locks en: {local_path}")
+                return f"Modelo HF descargado en caché local: {model_name}"
+            except Exception as second_exc:
+                emit(f"Reintento tras limpieza de locks falló: {second_exc}")
 
     emit("Intento 3/3: auto-reparación de dependencia huggingface_hub")
     try:
