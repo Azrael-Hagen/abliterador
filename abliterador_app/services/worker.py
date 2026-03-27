@@ -5,6 +5,8 @@ from abliterador_app.services.backends import (
     BackendError,
     create_backend,
     download_model,
+    is_hf_model_ready_local,
+    list_incomplete_hf_models_local,
     search_downloadable_models,
 )
 from abliterador_app.services.catalog import (
@@ -89,12 +91,14 @@ class ModelTaskWorker(QObject):
                 self.progress.emit("Calculando recomendaciones para tu equipo...")
                 recommendations = recommend_models(profile)
                 local_ollama = list_ollama_models()
+                incomplete_hf = list_incomplete_hf_models_local()
                 self.success.emit(
                     {
                         "operation": task.operation,
                         "profile": profile,
                         "recommendations": recommendations,
                         "local_ollama": local_ollama,
+                        "incomplete_hf": incomplete_hf,
                     }
                 )
                 return
@@ -102,6 +106,14 @@ class ModelTaskWorker(QObject):
             if task.operation == "load_abliterate":
                 if task.settings is None:
                     raise BackendError("No se recibieron parámetros de generación.")
+
+                normalized = task.model_name.strip()
+                is_ollama = normalized.startswith("ollama/") or ":" in normalized
+                if normalized and not is_ollama and not is_hf_model_ready_local(normalized):
+                    self.progress.emit(
+                        "Modelo HF no está completo localmente. Descargando antes de cargar para evitar bloqueos..."
+                    )
+                    download_model(normalized, progress_callback=self.progress.emit)
 
                 self.progress.emit(f"Cargando modelo: {task.model_name}...")
                 self.backend = create_backend(task.model_name, task.preferred_backend)

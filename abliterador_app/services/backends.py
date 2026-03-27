@@ -6,6 +6,17 @@ import subprocess
 import sys
 from abc import ABC, abstractmethod
 
+# Configure Hugging Face caches as early as possible, before importing transformers/heretic.
+_EARLY_HF_HOME = os.path.join(os.getcwd(), ".hf_cache")
+_EARLY_HF_HUB = os.path.join(_EARLY_HF_HOME, "hub")
+_EARLY_HF_TRANSFORMERS = os.path.join(_EARLY_HF_HOME, "transformers")
+os.makedirs(_EARLY_HF_HUB, exist_ok=True)
+os.makedirs(_EARLY_HF_TRANSFORMERS, exist_ok=True)
+os.environ["HF_HOME"] = _EARLY_HF_HOME
+os.environ["HF_HUB_CACHE"] = _EARLY_HF_HUB
+os.environ["HUGGINGFACE_HUB_CACHE"] = _EARLY_HF_HUB
+os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
+
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from abliterador_app.domain.models import GenerationSettings
@@ -43,8 +54,9 @@ def _configure_hf_environment() -> None:
     os.makedirs(transformers_cache, exist_ok=True)
 
     os.environ["HF_HOME"] = base
+    os.environ["HF_HUB_CACHE"] = hub_cache
     os.environ["HUGGINGFACE_HUB_CACHE"] = hub_cache
-    os.environ["TRANSFORMERS_CACHE"] = transformers_cache
+    os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
 
 
 def _has_dir_content(path: str) -> bool:
@@ -61,6 +73,39 @@ def _resolve_hf_model_source(model_name: str) -> tuple[str, str, str]:
     cache_dir, model_dir = _local_hf_paths(model_name)
     source = model_dir if _has_dir_content(model_dir) else model_name
     return source, cache_dir, model_dir
+
+
+def is_hf_model_ready_local(model_name: str) -> bool:
+    """Return True when a local downloaded HF model looks complete enough to load offline."""
+    _cache_dir, model_dir = _local_hf_paths(model_name)
+
+    config_path = os.path.join(model_dir, "config.json")
+    tokenizer_cfg = os.path.join(model_dir, "tokenizer_config.json")
+    if not os.path.isfile(config_path) or not os.path.isfile(tokenizer_cfg):
+        return False
+
+    shard_index_path = os.path.join(model_dir, "model.safetensors.index.json")
+    if os.path.isfile(shard_index_path):
+        try:
+            import json
+
+            with open(shard_index_path, "r", encoding="utf-8") as handle:
+                data = json.load(handle)
+            weight_map = data.get("weight_map", {})
+            shard_files = set(weight_map.values())
+            if not shard_files:
+                return False
+            return all(os.path.isfile(os.path.join(model_dir, name)) for name in shard_files)
+        except Exception:
+            return False
+
+    # Non-sharded formats.
+    if os.path.isfile(os.path.join(model_dir, "model.safetensors")):
+        return True
+    if os.path.isfile(os.path.join(model_dir, "pytorch_model.bin")):
+        return True
+
+    return False
 
 
 def _is_permission_or_lock_error(message: str) -> bool:
@@ -98,6 +143,23 @@ def _cleanup_hf_locks(cache_dir: str) -> int:
                     removed += 1
                 except Exception:
                     pass
+    return removed
+
+
+def _cleanup_hf_partial_artifacts(cache_dir: str, model_dir: str) -> int:
+    removed = _cleanup_hf_locks(cache_dir)
+    for base in [cache_dir, model_dir]:
+        if not base or not os.path.isdir(base):
+            continue
+        for root, _dirs, files in os.walk(base):
+            for filename in files:
+                if filename.endswith(".incomplete") or filename.endswith(".tmp"):
+                    partial_path = os.path.join(root, filename)
+                    try:
+                        os.remove(partial_path)
+                        removed += 1
+                    except Exception:
+                        pass
     return removed
 
 
@@ -390,6 +452,9 @@ def list_ollama_models() -> list[str]:
 
 def _safe_repo_path_component(repo_id: str) -> str:
     return repo_id.replace("/", "__").replace(":", "_")
+    
+def _decode_repo_path_component(name: str) -> str:
+    return name.replace("__", "/")
 
 
 def _local_hf_paths(repo_id: str) -> tuple[str, str]:
@@ -476,6 +541,9 @@ def download_model(
     # ── Hugging Face: estrategia resiliente con auto-reparación ─────────────
     emit(f"Iniciando descarga desde Hugging Face: {model_name}")
     cache_dir, model_dir = _local_hf_paths(model_name)
+    cleaned = _cleanup_hf_partial_artifacts(cache_dir, model_dir)
+    if cleaned:
+        emit(f"Limpieza preventiva completada (locks/temporales): {cleaned}")
     emit(f"Ruta de caché local: {cache_dir}")
     emit(f"Ruta de modelo local: {model_dir}")
     emit("Intento 1/3: huggingface-cli")
@@ -531,7 +599,7 @@ def download_model(
     except Exception as first_exc:
         emit(f"Fallback directo falló: {first_exc}")
         if _is_permission_or_lock_error(str(first_exc)):
-            removed = _cleanup_hf_locks(cache_dir)
+            removed = _cleanup_hf_partial_artifacts(cache_dir, model_dir)
             emit(f"Detectado problema de permisos/locks. Locks limpiados: {removed}. Reintentando...")
             try:
                 local_path = snapshot_download(
@@ -577,6 +645,21 @@ def download_model(
         raise BackendError(
             f"Falló la descarga de '{model_name}' desde Hugging Face incluso tras auto-reparación: {exc}"
         )
+
+
+def list_incomplete_hf_models_local() -> list[str]:
+    base_dir = os.path.join(os.getcwd(), "downloaded_models")
+    if not os.path.isdir(base_dir):
+        return []
+
+    incomplete = []
+    for entry in os.scandir(base_dir):
+        if not entry.is_dir():
+            continue
+        repo_id = _decode_repo_path_component(entry.name)
+        if not is_hf_model_ready_local(repo_id):
+            incomplete.append(repo_id)
+    return sorted(incomplete)
 
 
 def _is_ollama_model(model_name: str) -> bool:

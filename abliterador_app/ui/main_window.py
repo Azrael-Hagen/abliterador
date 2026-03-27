@@ -27,7 +27,7 @@ from PySide6.QtWidgets import (
 )
 
 from abliterador_app.domain.models import GenerationSettings, WorkerTask
-from abliterador_app.services.advisor import build_assistant_reply
+from abliterador_app.services.advisor import build_assistant_reply, classify_runtime_error
 from abliterador_app.services.backends import (
     BACKEND_MODE_AUTO,
     BACKEND_MODE_FALLBACK,
@@ -57,11 +57,14 @@ class ModelSearcher(QWidget):
         self._catalog_card_buttons = []
         self._hardware_profile = {}
         self._local_ollama_models: list = []
+        self._incomplete_hf_models: list[str] = []
         self._assistant_autopilot_enabled = True
         self._pending_generate_after_load = False
         self._last_failed_operation = ""
         self._last_failed_model = ""
         self._prefer_real_abliteration = True
+        self._recovery_attempts: dict[str, int] = {}
+        self._max_recovery_attempts = 2
 
         self.worker_thread = QThread(self)
         self.worker = ModelTaskWorker()
@@ -115,6 +118,7 @@ class ModelSearcher(QWidget):
         self.load_ollama_models()
         self.refresh_extensions_status()
         self.load_catalog()
+        self._assistant_set_recovery_state("monitoreo activo", "Esperando eventos")
         self._assistant_append("Asistente listo. Puedo recomendarte modelos y siguiente paso.")
 
     def _fit_and_center_window(self):
@@ -394,6 +398,17 @@ class ModelSearcher(QWidget):
         ops_row.addWidget(self.assistant_repair_button)
         ops_row.addStretch(1)
         assistant_layout.addLayout(ops_row)
+
+        status_row = QHBoxLayout()
+        self.assistant_state_chip = QLabel("Micro IA: monitoreo activo")
+        self.assistant_state_chip.setObjectName("outputMetaChip")
+        status_row.addWidget(self.assistant_state_chip)
+
+        self.assistant_action_chip = QLabel("Ultima accion: esperando")
+        self.assistant_action_chip.setObjectName("outputMetaChip")
+        status_row.addWidget(self.assistant_action_chip)
+        status_row.addStretch(1)
+        assistant_layout.addLayout(status_row)
 
         self.assistant_output = QTextEdit()
         self.assistant_output.setReadOnly(True)
@@ -1070,6 +1085,31 @@ class ModelSearcher(QWidget):
     def _assistant_append(self, text: str):
         self._append_feed(self.assistant_output, "Asistente", text, "assistant")
 
+    def _assistant_set_recovery_state(self, state: str, action: str):
+        self.assistant_state_chip.setText(f"Micro IA: {state}")
+        self.assistant_action_chip.setText(f"Ultima accion: {action}")
+
+    def _consume_recovery_attempt(self, key: str) -> bool:
+        attempts = self._recovery_attempts.get(key, 0)
+        if attempts >= self._max_recovery_attempts:
+            return False
+        self._recovery_attempts[key] = attempts + 1
+        return True
+
+    def _auto_adjust_after_memory_error(self):
+        original_tokens = self.max_tokens_input.value()
+        reduced_tokens = max(32, original_tokens // 2)
+        self.max_tokens_input.setValue(reduced_tokens)
+        self.do_sample_input.setChecked(False)
+        self.temperature_input.setValue(min(self.temperature_input.value(), 0.5))
+        self.top_p_input.setValue(min(self.top_p_input.value(), 0.8))
+        self._assistant_append(
+            "Ajuste anti-memoria aplicado: menos tokens, sampling desactivado y parámetros más conservadores."
+        )
+        self._append_output(
+            f"Ajuste por memoria: max_tokens {original_tokens} -> {reduced_tokens}, sampling=off, temperatura<=0.5"
+        )
+
     def _toggle_assistant_autopilot(self, enabled: bool):
         self._assistant_autopilot_enabled = enabled
         state = "activado" if enabled else "desactivado"
@@ -1087,38 +1127,45 @@ class ModelSearcher(QWidget):
     def _assistant_try_recover_error(self, error_message: str):
         if not self._assistant_autopilot_enabled:
             return False
+        diagnosis = classify_runtime_error(error_message)
+        category = diagnosis.get("category", "unknown")
+        target = diagnosis.get("target", "general")
+        assistant_message = diagnosis.get("assistant_message", "Intento recuperar el error.")
+        visible_state = diagnosis.get("visible_state", "auto-reparando")
 
-        low = error_message.lower()
-
-        if "huggingface-cli no encontrado" in low or "huggingface_hub" in low:
-            self._assistant_append("Detecté error de Hugging Face. Intento auto-reparación y reintento.")
-            self._set_busy(True)
-            self.main_tabs.setCurrentWidget(self.tab_output)
-            self.task_requested.emit(WorkerTask(operation="auto_repair", model_name="huggingface"))
-            return True
-
-        if "permissionerror" in low or "cache directory permissions" in low or "lock needs manual removal" in low:
+        recovery_key = f"{category}:{self._last_failed_operation}:{self._last_failed_model}".lower()
+        if not self._consume_recovery_attempt(recovery_key):
+            self._assistant_set_recovery_state("requiere intervención", f"Sin más reintentos para {category}")
             self._assistant_append(
-                "Detecté bloqueo/permisos en caché de Hugging Face. Limpio locks, reparo entorno y reintento."
+                "Ya intenté auto-recuperar este error varias veces. Te recomiendo revisar red/permisos/espacio y reintentar."
             )
-            self._set_busy(True)
-            self.main_tabs.setCurrentWidget(self.tab_output)
-            self.task_requested.emit(WorkerTask(operation="auto_repair", model_name="huggingface"))
-            return True
+            return False
 
-        if "ollama no está instalado" in low or "ollama no esta" in low:
-            self._assistant_append("Detecté error de Ollama. Cambio backend a Fallback para continuar.")
+        self._assistant_append(assistant_message)
+        self._assistant_set_recovery_state("autorecuperando", visible_state)
+
+        if category == "ollama_missing":
             self.backend_selector.setCurrentIndex(self.backend_selector.findData(BACKEND_MODE_FALLBACK))
+            self._assistant_set_recovery_state("degradado", "Cambio automático a backend Fallback")
             return True
 
-        if "backend heretic" in low or "heretic" in low:
-            self._assistant_append("Detecté error de Heretic. Intento auto-reparación del entorno y reintento.")
-            self._set_busy(True)
-            self.main_tabs.setCurrentWidget(self.tab_output)
-            self.task_requested.emit(WorkerTask(operation="auto_repair", model_name="heretic"))
-            return True
+        if category == "memory":
+            self._auto_adjust_after_memory_error()
+            if self._last_failed_operation == "generate":
+                self._set_busy(True)
+                self.main_tabs.setCurrentWidget(self.tab_model_chat)
+                self.generate_text()
+                return True
+            if self._last_failed_operation == "load_abliterate":
+                self._set_busy(True)
+                self.main_tabs.setCurrentWidget(self.tab_output)
+                self.apply_heretic()
+                return True
 
-        return False
+        self._set_busy(True)
+        self.main_tabs.setCurrentWidget(self.tab_output)
+        self.task_requested.emit(WorkerTask(operation="auto_repair", model_name=target))
+        return True
 
     def _assistant_ask(self):
         question = self.assistant_input.text().strip() or "que modelo me conviene"
@@ -1280,6 +1327,8 @@ class ModelSearcher(QWidget):
             return
 
         settings = self._build_settings()
+        self._last_failed_operation = "generate"
+        self._last_failed_model = self.current_model_name or self._current_selected_model_name()
         self._set_busy(True)
         self.main_tabs.setCurrentWidget(self.tab_model_chat)
         self._model_chat_append("Tu", prompt, "user")
@@ -1322,6 +1371,9 @@ class ModelSearcher(QWidget):
         if operation == "generate":
             self._update_output_meta(state="respuesta lista", model=model_name, backend=backend)
             self._update_chat_context_meta(model=model_name, backend=backend)
+            self._last_failed_operation = ""
+            self._last_failed_model = ""
+            self._assistant_set_recovery_state("estable", "Generación completada")
             if output:
                 self._model_chat_append("Modelo", output, "model")
                 output = ""
@@ -1339,6 +1391,7 @@ class ModelSearcher(QWidget):
             profile = payload.get("profile", {})
             recommendations = payload.get("recommendations", [])
             self._local_ollama_models = payload.get("local_ollama", [])
+            self._incomplete_hf_models = payload.get("incomplete_hf", [])
             self._hardware_profile = profile
             ram = profile.get("ram_gb", 0)
             vram = profile.get("vram_gb", 0)
@@ -1352,6 +1405,16 @@ class ModelSearcher(QWidget):
             self._update_output_meta(state="catalogo listo")
             self._append_output(f"Catalogo cargado: {len(recommendations)} modelos.")
             self._assistant_append(build_assistant_reply("que modelo me recomiendas", self._assistant_context()))
+            if self._incomplete_hf_models:
+                short_list = ", ".join(self._incomplete_hf_models[:2])
+                extra = "" if len(self._incomplete_hf_models) <= 2 else f" (+{len(self._incomplete_hf_models) - 2} más)"
+                self._assistant_append(
+                    "Detecté descargas HF incompletas (posible cierre inesperado): "
+                    f"{short_list}{extra}. Haré recuperación automática al intentar cargar esos modelos."
+                )
+                self._assistant_set_recovery_state("atención", "Modelos incompletos detectados")
+            else:
+                self._assistant_set_recovery_state("estable", "Catalogo listo")
 
         if operation == "download_model":
             self._update_output_meta(state="modelo descargado", model=model_name)
@@ -1360,15 +1423,18 @@ class ModelSearcher(QWidget):
             self._assistant_append("Descarga finalizada. Puedo recomendarte backend para usarlo.")
             self._last_failed_operation = ""
             self._last_failed_model = ""
+            self._assistant_set_recovery_state("estable", "Descarga completada")
 
         if operation == "load_abliterate":
             self._last_failed_operation = ""
             self._last_failed_model = ""
+            self._assistant_set_recovery_state("estable", "Modelo cargado y listo")
 
         if operation == "auto_repair":
             self._update_output_meta(state="entorno reparado")
             self._append_output(payload.get("output", "Auto-reparación completada."))
             self._assistant_append("Auto-reparación completada. Reintento la operación fallida si aplica.")
+            self._assistant_set_recovery_state("estable", "Auto-reparación finalizada")
             if self._last_failed_operation == "download_model" and self._last_failed_model:
                 self._append_output(f"Reintentando descarga: {self._last_failed_model}")
                 self._set_busy(True)
@@ -1380,6 +1446,10 @@ class ModelSearcher(QWidget):
                 self._append_output("Reintentando carga y abliteración...")
                 self.apply_heretic()
                 return
+            if self._last_failed_operation == "generate":
+                self._append_output("Reintentando generación tras auto-reparación...")
+                self.generate_text()
+                return
 
         if output:
             self._append_output("\n--- Salida ---\n")
@@ -1390,9 +1460,11 @@ class ModelSearcher(QWidget):
         self._set_busy(False)
         self._update_output_meta(state="error")
         self._append_output(f"Error: {error_message}")
+        self._assistant_set_recovery_state("error detectado", "Evaluando auto-recovery")
         recovered = self._assistant_try_recover_error(error_message)
         if recovered:
             return
+        self._assistant_set_recovery_state("bloqueado", "Se requiere intervención manual")
         QMessageBox.critical(self, "Error", f"No se pudo completar la operacion:\n{error_message}")
 
     def closeEvent(self, event):

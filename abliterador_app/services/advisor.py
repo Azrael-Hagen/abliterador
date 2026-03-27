@@ -69,3 +69,89 @@ def build_assistant_reply(question: str, context: dict) -> str:
         "Puedo ayudarte con: recomendación de modelo, backend correcto, descarga, pasos siguientes y riesgos. "
         "Ejemplo: 'que modelo me recomiendas para mi pc'."
     )
+
+
+def classify_runtime_error(error_message: str) -> dict:
+    """Classify backend/runtime errors and suggest auto-recovery action."""
+    raw = (error_message or "").strip()
+    low = raw.lower()
+
+    if any(x in low for x in ["permissionerror", "cache directory permissions", "lock needs manual removal", "winerror 5"]):
+        return {
+            "category": "hf_permissions_lock",
+            "target": "huggingface",
+            "assistant_message": "Detecté un bloqueo de caché/permisos en Hugging Face. Haré limpieza y auto-reparación.",
+            "visible_state": "auto-reparando cache hf",
+            "retry": True,
+        }
+
+    if any(x in low for x in ["read timed out", "connection", "temporary failure", "network", "name resolution"]):
+        return {
+            "category": "network",
+            "target": "download",
+            "assistant_message": "Detecté un problema de red. Reintentaré descarga de forma segura.",
+            "visible_state": "reintentando descarga",
+            "retry": True,
+        }
+
+    if any(x in low for x in ["no space left", "not enough space", "espacio", "disk full"]):
+        return {
+            "category": "disk",
+            "target": "storage",
+            "assistant_message": "Detecté falta de espacio en disco. Haré limpieza de temporales y te avisaré.",
+            "visible_state": "revisando almacenamiento",
+            "retry": False,
+        }
+
+    if any(x in low for x in ["out of memory", "cuda out of memory", "memoryerror", "cublas"]):
+        return {
+            "category": "memory",
+            "target": "memory",
+            "assistant_message": "Detecté un error de memoria. Ajustaré parámetros para reducir consumo y reintentar.",
+            "visible_state": "ajustando parametros por memoria",
+            "retry": True,
+        }
+
+    if "huggingface-cli no encontrado" in low or "huggingface_hub" in low:
+        return {
+            "category": "hf_dependency",
+            "target": "huggingface",
+            "assistant_message": "Detecté dependencia faltante de Hugging Face. Intento auto-reparación.",
+            "visible_state": "auto-reparando hf",
+            "retry": True,
+        }
+
+    if "ollama no está instalado" in low or "ollama no esta" in low:
+        return {
+            "category": "ollama_missing",
+            "target": "ollama",
+            "assistant_message": "Detecté que Ollama no está disponible. Cambiaré backend para continuar.",
+            "visible_state": "cambiando backend",
+            "retry": False,
+        }
+
+    if "backend heretic" in low or "heretic" in low:
+        return {
+            "category": "heretic",
+            "target": "heretic",
+            "assistant_message": "Detecté error de Heretic. Intento auto-reparación y reintento.",
+            "visible_state": "auto-reparando heretic",
+            "retry": True,
+        }
+
+    if any(x in low for x in ["not a valid model identifier", "can't load", "tokenizer_config", "config.json"]):
+        return {
+            "category": "model_incomplete",
+            "target": "download",
+            "assistant_message": "El modelo parece incompleto/corrupto. Reintentaré descarga para recuperarlo.",
+            "visible_state": "recuperando modelo",
+            "retry": True,
+        }
+
+    return {
+        "category": "unknown",
+        "target": "general",
+        "assistant_message": "Detecté un error no clasificado. Intentaré auto-reparación general.",
+        "visible_state": "auto-reparando",
+        "retry": False,
+    }

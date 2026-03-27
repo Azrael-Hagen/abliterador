@@ -89,8 +89,9 @@ def _prepare_local_hf_cache(progress_callback: Callable[[str], None] | None = No
     os.makedirs(transformers_dir, exist_ok=True)
 
     os.environ["HF_HOME"] = cache_dir
+    os.environ["HF_HUB_CACHE"] = hub_dir
     os.environ["HUGGINGFACE_HUB_CACHE"] = hub_dir
-    os.environ["TRANSFORMERS_CACHE"] = transformers_dir
+    os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
     _emit(progress_callback, f"Cache local de Hugging Face preparado: {cache_dir}")
     return cache_dir
 
@@ -139,6 +140,27 @@ def attempt_auto_repair(target: str, progress_callback: Callable[[str], None] | 
             "ok": False,
             "message": "No se encontro soporte Hugging Face despues de la reparacion.",
         }
+
+    if target in {"storage", "disk", "espacio"}:
+        base = os.getcwd()
+        cache_dir = _prepare_local_hf_cache(progress_callback)
+        removed_local = _cleanup_lockfiles(cache_dir, progress_callback)
+        user_cache = os.path.join(os.path.expanduser("~"), ".cache", "huggingface", "hub")
+        removed_user = _cleanup_lockfiles(user_cache, progress_callback)
+
+        try:
+            usage = shutil.disk_usage(base)
+            free_gb = usage.free / (1024 ** 3)
+            total_gb = usage.total / (1024 ** 3)
+            msg = (
+                f"Almacenamiento revisado. Libre: {free_gb:.1f} GB de {total_gb:.1f} GB. "
+                f"Locks limpiados: local={removed_local}, user={removed_user}."
+            )
+            if free_gb < 6:
+                return {"ok": False, "message": msg + " Espacio bajo para modelos grandes; libera disco y reintenta."}
+            return {"ok": True, "message": msg}
+        except Exception as exc:
+            return {"ok": False, "message": f"No se pudo inspeccionar almacenamiento: {exc}"}
 
     if target in {"ollama"}:
         try:
