@@ -371,7 +371,37 @@ class ModernHereticBackend(BaseAbliterationBackend):
         bad = [self._build_prompt(t) for t in self.bad_prompt_texts[:limit]]
         return good, bad
 
+    @staticmethod
+    def _is_cpu_only_runtime() -> bool:
+        try:
+            import torch
+
+            return not torch.cuda.is_available()
+        except Exception:
+            return True
+
+    @staticmethod
+    def _model_size_b_from_name(model_name: str) -> float | None:
+        lower = model_name.lower()
+        match = re.search(r"(\d+(?:\.\d+)?)b", lower)
+        if not match:
+            return None
+        try:
+            return float(match.group(1))
+        except Exception:
+            return None
+
+    def _looks_too_heavy_for_cpu(self, model_name: str) -> bool:
+        size_b = self._model_size_b_from_name(model_name)
+        return size_b is not None and size_b >= 4.0 and self._is_cpu_only_runtime()
+
     def load_and_abliterate(self, model_name: str, prompt: str, settings: GenerationSettings) -> str:
+        if self._looks_too_heavy_for_cpu(model_name):
+            raise BackendError(
+                "Este modelo (>=4B) es demasiado pesado para CPU-only en este equipo y puede quedar colgado. "
+                "Usa un modelo <=3B, backend Ollama o una GPU."
+            )
+
         runtime_settings = self._build_settings(model_name, settings)
         try:
             model = self.model_cls(runtime_settings)
@@ -392,7 +422,7 @@ class ModernHereticBackend(BaseAbliterationBackend):
                 "[Heretic] Modelo ya abliterado detectado — se omite paso de cálculo de residuales"
             )
             self.model = model
-            return self.generate(prompt, settings)
+            return "Modelo ya abliterado cargado. Listo para generar manualmente."
 
         good_prompts, bad_prompts = self._calibration_prompts()
 
@@ -420,14 +450,23 @@ class ModernHereticBackend(BaseAbliterationBackend):
         model.abliterate(refusal_directions, None, params)
         self.model = model
 
-        return self.generate(prompt, settings)
+        return "Abliteración completada. Modelo listo para generar manualmente."
 
     def generate(self, prompt: str, settings: GenerationSettings) -> str:
         if self.model is None:
             raise BackendError("No hay modelo Heretic cargado todavía.")
 
+        if self._looks_too_heavy_for_cpu(getattr(self.model.settings, "model", "")):
+            raise BackendError(
+                "Generación bloqueada: modelo >=4B en CPU-only. Cambia a <=3B u Ollama para evitar cuelgue."
+            )
+
         # Keep generation length configurable after the model is loaded.
-        self.model.settings.max_response_length = max(16, settings.max_new_tokens)
+        requested_tokens = max(16, settings.max_new_tokens)
+        if self._is_cpu_only_runtime() and requested_tokens > 64:
+            requested_tokens = 64
+            self._emit("[Heretic] CPU-only detectado: max_new_tokens limitado a 64 para evitar tiempos extremos.")
+        self.model.settings.max_response_length = requested_tokens
 
         prompts = [self._build_prompt(prompt)]
         responses = self.model.get_responses(prompts, skip_special_tokens=True)
