@@ -1307,6 +1307,30 @@ class ModelSearcher(QWidget):
         self.load_catalog()
 
     def _pick_preferred_hf_model_name(self) -> str | None:
+        # On CPU-only machines, avoid forcing heavy HF models (>=4B) when
+        # "Preferencia de abliteración real" is enabled.
+        vram_gb = float(self._hardware_profile.get("vram_gb", 0.0) or 0.0)
+        cpu_only = vram_gb <= 0.1
+        max_params_b = 3.8 if cpu_only else None
+
+        def allowed(model) -> bool:
+            if model.source != SOURCE_HUGGINGFACE:
+                return False
+            if max_params_b is None:
+                return True
+            return float(getattr(model, "params_b", 999.0)) <= max_params_b
+
+        for model, reason in self._catalog_recommendations:
+            if allowed(model) and reason.startswith("✅"):
+                return model.name
+        for model, _reason in self._catalog_recommendations:
+            if allowed(model):
+                return model.name
+
+        # If we are CPU-only and all HF candidates are too heavy, don't force-switch.
+        if cpu_only:
+            return None
+
         for model, reason in self._catalog_recommendations:
             if model.source == SOURCE_HUGGINGFACE and reason.startswith("✅"):
                 return model.name
@@ -1559,7 +1583,7 @@ class ModelSearcher(QWidget):
                     selected_mode = BACKEND_MODE_HERETIC
                 else:
                     self._assistant_append(
-                        "No encontré modelos HF en el catálogo para abliteración real; continúo con el backend seleccionado."
+                        "No encontré modelos HF compatibles con tu hardware para abliteración real; mantengo tu modelo/backend seleccionado."
                     )
 
         if selected_mode == BACKEND_MODE_HERETIC and ":" in model_name:
