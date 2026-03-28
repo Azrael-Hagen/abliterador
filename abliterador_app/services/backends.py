@@ -4,6 +4,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 from abc import ABC, abstractmethod
 
 # Configure Hugging Face caches as early as possible, before importing transformers/heretic.
@@ -120,6 +121,24 @@ def _is_permission_or_lock_error(message: str) -> bool:
             "filelock",
             "lock file",
             "lock needs manual removal",
+        ]
+    )
+
+
+def _is_transient_network_error(message: str) -> bool:
+    low = (message or "").lower()
+    return any(
+        token in low
+        for token in [
+            "read timed out",
+            "timed out",
+            "connection",
+            "temporary failure",
+            "name resolution",
+            "ssl",
+            "proxyerror",
+            "remote end closed connection",
+            "max retries exceeded",
         ]
     )
 
@@ -330,7 +349,16 @@ class ModernHereticBackend(BaseAbliterationBackend):
 
     def load_and_abliterate(self, model_name: str, prompt: str, settings: GenerationSettings) -> str:
         runtime_settings = self._build_settings(model_name, settings)
-        model = self.model_cls(runtime_settings)
+        try:
+            model = self.model_cls(runtime_settings)
+        except Exception as exc:
+            low = str(exc).lower()
+            if "offload whole model to disk" in low or "disk_offload" in low:
+                # Conservative recovery path: avoid disk-offload loops by forcing CPU map.
+                runtime_settings.device_map = "cpu"
+                model = self.model_cls(runtime_settings)
+            else:
+                raise
 
         good_prompts = [self._build_prompt(text) for text in self.good_prompt_texts]
         bad_prompts = [self._build_prompt(text) for text in self.bad_prompt_texts]
@@ -605,19 +633,7 @@ def download_model(
     try:
         from huggingface_hub import snapshot_download
 
-        local_path = snapshot_download(
-            repo_id=model_name,
-            resume_download=True,
-            cache_dir=cache_dir,
-            local_dir=model_dir,
-        )
-        emit(f"✅ Modelo descargado con huggingface_hub en: {local_path}")
-        return f"Modelo HF descargado en caché local: {model_name}"
-    except Exception as first_exc:
-        emit(f"Fallback directo falló: {first_exc}")
-        if _is_permission_or_lock_error(str(first_exc)):
-            removed = _cleanup_hf_partial_artifacts(cache_dir, model_dir)
-            emit(f"Detectado problema de permisos/locks. Locks limpiados: {removed}. Reintentando...")
+        for attempt in range(1, 4):
             try:
                 local_path = snapshot_download(
                     repo_id=model_name,
@@ -625,10 +641,33 @@ def download_model(
                     cache_dir=cache_dir,
                     local_dir=model_dir,
                 )
-                emit(f"✅ Modelo descargado tras limpiar locks en: {local_path}")
+
+                if not is_hf_model_ready_local(model_name):
+                    raise BackendError(
+                        "La descarga finalizó pero el modelo quedó incompleto. "
+                        "Se reintentará para recuperar shards faltantes."
+                    )
+
+                emit(f"✅ Modelo descargado con huggingface_hub en: {local_path}")
                 return f"Modelo HF descargado en caché local: {model_name}"
-            except Exception as second_exc:
-                emit(f"Reintento tras limpieza de locks falló: {second_exc}")
+            except Exception as snapshot_exc:
+                msg = str(snapshot_exc)
+                emit(f"Intento API {attempt}/3 falló: {msg}")
+
+                if _is_permission_or_lock_error(msg):
+                    removed = _cleanup_hf_partial_artifacts(cache_dir, model_dir)
+                    emit(f"Permisos/locks detectados. Limpieza aplicada: {removed}")
+
+                if _is_transient_network_error(msg) and attempt < 3:
+                    wait_seconds = min(10, 2 * attempt)
+                    emit(f"Fallo transitorio de red. Reintento en {wait_seconds}s...")
+                    time.sleep(wait_seconds)
+                    continue
+
+                if attempt == 3:
+                    raise
+    except Exception as first_exc:
+        emit(f"Fallback directo falló: {first_exc}")
 
     emit("Intento 3/3: auto-reparación de dependencia huggingface_hub")
     try:
@@ -656,6 +695,11 @@ def download_model(
             cache_dir=cache_dir,
             local_dir=model_dir,
         )
+        if not is_hf_model_ready_local(model_name):
+            raise BackendError(
+                "Descarga completada tras auto-reparación, pero el modelo sigue incompleto. "
+                "Reintenta con red estable o limpia caché y vuelve a descargar."
+            )
         emit(f"✅ Modelo descargado tras auto-reparación en: {local_path}")
         return f"Modelo HF descargado en caché local: {model_name}"
     except Exception as exc:

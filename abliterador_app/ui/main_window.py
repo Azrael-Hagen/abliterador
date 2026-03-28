@@ -56,9 +56,11 @@ MODEL_NAME_ALLOWLIST = re.compile(r"^[a-zA-Z0-9._\-\/:]{3,128}$")
 class ModelSearcher(QWidget):
     task_requested = Signal(object)
 
-    def __init__(self):
+    def __init__(self, version: str = ""):
         super().__init__()
-        self.setWindowTitle("Abliterador Studio")
+        self._app_version = version
+        title = f"Abliterador Studio v{version}" if version else "Abliterador Studio"
+        self.setWindowTitle(title)
         self.setMinimumSize(980, 680)
         self._logo_path = self._resolve_logo_path()
         if self._logo_path is not None:
@@ -149,6 +151,11 @@ class ModelSearcher(QWidget):
         self.status_label = QLabel("Listo")
         self.status_label.setObjectName("statusLabel")
         footer.addWidget(self.status_label)
+
+        if self._app_version:
+            version_label = QLabel(f"v{self._app_version}")
+            version_label.setObjectName("outputMetaChip")
+            footer.addWidget(version_label)
         root_layout.addLayout(footer)
 
         self.setLayout(root_layout)
@@ -197,6 +204,10 @@ class ModelSearcher(QWidget):
         self.startup_detail.setWordWrap(True)
         startup_layout.addWidget(self.startup_detail)
 
+        self.startup_recovery_chip = QLabel("Micro IA: preparando diagnóstico")
+        self.startup_recovery_chip.setObjectName("outputMetaChip")
+        startup_layout.addWidget(self.startup_recovery_chip)
+
         self.startup_progress = QProgressBar()
         self.startup_progress.setRange(0, 100)
         self.startup_progress.setValue(0)
@@ -223,6 +234,7 @@ class ModelSearcher(QWidget):
         step = steps[self._boot_step_index]
         self.startup_title.setText(step.title)
         self.startup_detail.setText(step.detail)
+        self.startup_recovery_chip.setText(f"Micro IA: paso {self._boot_step_index + 1}/{len(steps)}")
         self._append_output(f"Proceso de inicio: {step.title}")
 
         if step.operation:
@@ -252,6 +264,7 @@ class ModelSearcher(QWidget):
     def _finish_boot_sequence(self):
         self.startup_title.setText("Arranque completado")
         self.startup_detail.setText("La interfaz está lista para trabajar.")
+        self.startup_recovery_chip.setText("Micro IA: monitoreo activo")
         self.startup_progress.setValue(100)
         self._append_output("✅ Motor interno listo")
         self._set_busy(False)
@@ -635,7 +648,7 @@ class ModelSearcher(QWidget):
         self.setStyleSheet(
             """
             QWidget {
-                background: #090d14;
+                background: #0a1118;
                 color: #e7edf3;
             }
             QGroupBox {
@@ -696,7 +709,7 @@ class ModelSearcher(QWidget):
                 padding-right: 10px;
             }
             #subtitleLabel {
-                color: #8bb9d8;
+                color: #9dcfe7;
                 margin-bottom: 4px;
             }
             #stepsLabel {
@@ -785,7 +798,7 @@ class ModelSearcher(QWidget):
                 font-weight: 700;
             }
             #outputHero {
-                background: #10161d;
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #10161d, stop:1 #13212f);
                 border: 1px solid #24313d;
                 border-radius: 18px;
             }
@@ -1283,6 +1296,8 @@ class ModelSearcher(QWidget):
     def _assistant_set_recovery_state(self, state: str, action: str):
         self.assistant_state_chip.setText(f"Micro IA: {state}")
         self.assistant_action_chip.setText(f"Ultima accion: {action}")
+        if self.startup_panel.isVisible():
+            self.startup_recovery_chip.setText(f"Micro IA: {state}")
 
     def _consume_recovery_attempt(self, key: str) -> bool:
         attempts = self._recovery_attempts.get(key, 0)

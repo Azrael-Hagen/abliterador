@@ -20,6 +20,29 @@ from abliterador_app.services.self_heal import attempt_auto_repair
 from abliterador_app.services.logger import get_log_path, get_logger
 
 
+def _looks_like_hf_repairable_error(message: str) -> bool:
+    low = (message or "").lower()
+    return any(
+        token in low
+        for token in [
+            "permissionerror",
+            "cache directory permissions",
+            "winerror 5",
+            "lock",
+            "huggingface_hub",
+            "timed out",
+            "temporary failure",
+            "name resolution",
+            "connection",
+        ]
+    )
+
+
+def _looks_like_heretic_batch_error(message: str) -> bool:
+    low = (message or "").lower()
+    return "range() arg 3 must not be zero" in low or "batch_size" in low
+
+
 class ModelTaskWorker(QObject):
     progress = Signal(str)
     success = Signal(dict)
@@ -93,10 +116,25 @@ class ModelTaskWorker(QObject):
                     raise BackendError("Selecciona un modelo para descargar.")
 
                 self.progress.emit(f"Preparando descarga: {model_name}...")
-                message = download_model(
-                    model_name,
-                    progress_callback=self.progress.emit,
-                )
+                try:
+                    message = download_model(
+                        model_name,
+                        progress_callback=self.progress.emit,
+                    )
+                except Exception as exc:
+                    if _looks_like_hf_repairable_error(str(exc)):
+                        self.progress.emit("Micro IA: detecté un error reparable en descarga. Ejecutando auto-reparación HF...")
+                        repair = attempt_auto_repair("huggingface", progress_callback=self.progress.emit)
+                        if repair.get("ok", False):
+                            self.progress.emit("Micro IA: reintentando descarga tras auto-reparación...")
+                            message = download_model(
+                                model_name,
+                                progress_callback=self.progress.emit,
+                            )
+                        else:
+                            raise BackendError(repair.get("message", "No se pudo reparar Hugging Face automáticamente."))
+                    else:
+                        raise
                 self.success.emit(
                     {
                         "operation": task.operation,
@@ -157,7 +195,17 @@ class ModelTaskWorker(QObject):
                     self.progress.emit(
                         "Modelo HF no está completo localmente. Descargando antes de cargar para evitar bloqueos..."
                     )
-                    download_model(normalized, progress_callback=self.progress.emit)
+                    try:
+                        download_model(normalized, progress_callback=self.progress.emit)
+                    except Exception as exc:
+                        if _looks_like_hf_repairable_error(str(exc)):
+                            self.progress.emit("Micro IA: intento de recuperación de descarga HF previo a la carga...")
+                            repair = attempt_auto_repair("huggingface", progress_callback=self.progress.emit)
+                            if not repair.get("ok", False):
+                                raise BackendError(repair.get("message", "No se pudo reparar la caché HF."))
+                            download_model(normalized, progress_callback=self.progress.emit)
+                        else:
+                            raise
 
                 self.progress.emit(f"Cargando modelo: {task.model_name}...")
                 self.backend = create_backend(task.model_name, task.preferred_backend)
@@ -169,11 +217,27 @@ class ModelTaskWorker(QObject):
                         "Nota: este backend no aplica abliteración real; se usa para pruebas de generación local."
                     )
 
-                output = self.backend.load_and_abliterate(
-                    task.model_name,
-                    task.prompt,
-                    task.settings,
-                )
+                try:
+                    output = self.backend.load_and_abliterate(
+                        task.model_name,
+                        task.prompt,
+                        task.settings,
+                    )
+                except Exception as exc:
+                    if _looks_like_heretic_batch_error(str(exc)):
+                        self.progress.emit(
+                            "Micro IA: detecté configuración inválida de batch en Heretic. Auto-reparando y reintentando..."
+                        )
+                        repair = attempt_auto_repair("heretic", progress_callback=self.progress.emit)
+                        if not repair.get("ok", False):
+                            raise BackendError(repair.get("message", "No se pudo reparar Heretic automáticamente."))
+                        output = self.backend.load_and_abliterate(
+                            task.model_name,
+                            task.prompt,
+                            task.settings,
+                        )
+                    else:
+                        raise
                 self.loaded_model_name = task.model_name
                 self.success.emit(
                     {

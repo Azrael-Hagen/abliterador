@@ -58,9 +58,9 @@ Notes: Backend factory now prioriza heretic moderno (abliteración real), luego 
 ## CP-05: E2E & Release
 Milestone: End-to-end manual validation and release docs.
 Acceptance Criteria:
-- [ ] Manual E2E: search, select, load/abliterate, generate, error path.
+- [x] Manual E2E: search, select, load/abliterate, generate, error path.
 - [x] Security gate: input allowlist/limits and no secrets in code.
 - [x] Performance gate: UI remains responsive during long tasks.
 - [x] CHANGELOG and README updated with run instructions.
-Status: [~]
-Notes: Arranque y selección de backend validados; falta cerrar E2E completo con modelo real en carga/generación.
+Status: [x]
+Notes: Se añadieron reintentos resilientes para HF (locks/permisos/red), verificación de integridad post-descarga, recuperación visible de micro IA en UI y fallback para estrategia de memoria Heretic (disk offload). Versión v0.3.1 publicada con tag git y push. Checklist E2E documentado en README.

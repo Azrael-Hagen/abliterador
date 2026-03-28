@@ -1,6 +1,17 @@
-# Abliterador Basico
+# Abliterador Studio
+
+**Versión:** `v0.3.1` — *2026-03-28*
 
 Aplicacion GUI en PySide6 para buscar modelos, cargarlos localmente, aplicar abliteración y probar generacion de texto.
+
+## Historial de versiones resumido
+
+| Versión | Fecha | Cambios principales |
+|---------|-------|---------------------|
+| `0.3.1` | 2026-03-28 | Descarga HF resiliente con reintentos/backoff, auto-recuperación en worker, chip Micro IA durante arranque, fallback CPU para disk-offload Heretic |
+| `0.3.0` | 2026-03-26 | Paquete modular (domain/services/ui), integración real Heretic, factory de backends, GUI profesional |
+| `0.2.0` | 2026-03-26 | Worker QThread, controles de generación (tokens, temp, top-p), validaciones de entrada |
+| `0.1.0` | 2026-03-26 | Baseline arquitectural: CHECKPOINTS, MODULES, VERSIONING, ENGINEER_LOG |
 
 ## Objetivo
 Permitir experimentacion local con modelos usando una interfaz simple y segura, priorizando responsividad de GUI y validaciones claras.
@@ -59,6 +70,31 @@ python abliterador_studio.py
 - Boton de recarga de modelos Ollama e integración visual con estado.
 - Tema visual moderno con tarjetas, colores profesionales e iconos nativos Qt.
 - Búsqueda de modelos descargables (Ollama + Hugging Face) y descarga directa para modelos de Ollama.
+
+## Resiliencia y auto-reparación
+- Descarga Hugging Face con estrategia robusta: limpieza preventiva de locks/temporales, reintentos de red y validación de integridad local.
+- Si se detecta error reparable (permisos, locks, dependencia HF, batch Heretic), la Micro IA ejecuta auto-reparación y reintento controlado.
+- Registro persistente en `logs/abliterador.log` para diagnóstico posterior.
+
+## Arranque y rendimiento
+- Arranque modular con progreso visible (motor interno, extensiones, perfil de hardware, catálogo).
+- Operaciones pesadas siguen en `QThread` para evitar bloqueo de interfaz.
+- Estrategia conservadora ante offload inestable: fallback seguro para mantener continuidad de uso.
+
+## Checklist E2E v0.3.1 (aprobado/no aprobado)
+
+Ejecuta contra un modelo HF real (ej. `Qwen/Qwen2.5-0.5B-Instruct`) en entorno con venv activado:
+
+| # | Paso | Criterio de aprobado |
+|---|------|----------------------|
+| 1 | `python abliterador_studio.py` | App arranca, chip Micro IA visible, barra de arranque completa |
+| 2 | Buscar modelo por nombre | Lista aparece sin error; validación de entrada vacía muestra aviso |
+| 3 | Seleccionar modelo y descargar | Progreso en panel Salida; descarga completa sin crash; integridad confirmada |
+| 4 | Cargar + abliterar | Backend seleccionado aparece en chip; flujo termina con ✅ en Salida |
+| 5 | Generar con prompt corto | Respuesta aparece en tab Chat Modelo y panel Salida |
+| 6 | Provocar error de red (desconectar) | Micro IA muestra estado de recuperación; reintento automático visible |
+| 7 | Cerrar y re-abrir app | Modelos cacheados detectados correctamente al arrancar |
+| 8 | Revisar `logs/abliterador.log` | Sin trazas ERROR no manejadas |
 
 ## Referencias de investigacion
 - Qt threading (QThread worker-object pattern): https://doc.qt.io/qtforpython-6/PySide6/QtCore/QThread.html

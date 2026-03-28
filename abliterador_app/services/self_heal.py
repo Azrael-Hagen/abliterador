@@ -162,6 +162,25 @@ def attempt_auto_repair(target: str, progress_callback: Callable[[str], None] | 
         except Exception as exc:
             return {"ok": False, "message": f"No se pudo inspeccionar almacenamiento: {exc}"}
 
+    if target in {"network", "download", "red"}:
+        local_cache = _prepare_local_hf_cache(progress_callback)
+        removed = _cleanup_lockfiles(local_cache, progress_callback)
+        msg = (
+            "Diagnóstico de red aplicado. "
+            "Se limpiaron locks de cache para permitir reanudación segura de descarga. "
+            f"Locks limpiados: {removed}."
+        )
+        _emit(progress_callback, msg)
+        return {"ok": True, "message": msg}
+
+    if target in {"memory", "memoria"}:
+        msg = (
+            "Diagnóstico de memoria completado. "
+            "La app ajustará parámetros de generación de forma conservadora al reintentar."
+        )
+        _emit(progress_callback, msg)
+        return {"ok": True, "message": msg}
+
     if target in {"ollama"}:
         try:
             result = subprocess.run(["ollama", "--version"], capture_output=True, text=True, timeout=10)

@@ -36,7 +36,7 @@ def build_assistant_reply(question: str, context: dict) -> str:
 
     if any(k in q for k in ["descarg", "download", "bajar"]):
         return (
-            "Para descargar: ve a la pestaña 'Catalogo abliterado', filtra/busca, "
+            "Para descargar: ve a la pestaña 'Catalogo', filtra/busca, "
             "selecciona un modelo y pulsa 'Descargar seleccionado'. "
             "Verás progreso en 'Salida y Estado'."
         )
@@ -168,6 +168,15 @@ def classify_runtime_error(error_message: str) -> dict:
             "retry": True,
         }
 
+    if "offload whole model to disk" in low or "disk_offload" in low:
+        return {
+            "category": "heretic_memory_strategy",
+            "target": "memory",
+            "assistant_message": "Detecté una estrategia de memoria agresiva (disk offload). Ajustaré ejecución y reintento seguro.",
+            "visible_state": "ajustando estrategia de memoria",
+            "retry": True,
+        }
+
     if "huggingface-cli no encontrado" in low or "huggingface_hub" in low:
         return {
             "category": "hf_dependency",
@@ -243,6 +252,13 @@ def humanize_runtime_error(error_message: str) -> dict:
             "title": "Memoria insuficiente",
             "summary": "El modelo o generación superó la memoria disponible del sistema.",
             "hint": "Reduce max tokens o usa un modelo más pequeño.",
+        }
+
+    if category == "heretic_memory_strategy":
+        return {
+            "title": "Estrategia de memoria inestable",
+            "summary": "El backend intentó offload completo a disco y la carga quedó inestable.",
+            "hint": "Usa un modelo más ligero o backend alternativo mientras se reajusta memoria automáticamente.",
         }
 
     if category == "heretic":

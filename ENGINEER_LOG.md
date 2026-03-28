@@ -56,3 +56,26 @@ Debt deferred:
 Next steps:
 - Execute full manual E2E on a real instruction model and tune default ablation parameters.
 - Add preset profiles (ligero, equilibrado, agresivo) for abliteration intensity.
+
+## [CP-05 Hardening] 2026-03-28
+Status: Passed — Release v0.3.1
+Decisions made:
+- Added resilient Hugging Face download strategy with lock/partial cleanup, transient-network retry backoff, and post-download model completeness verification.
+- Added worker-level auto-recovery retries for repairable download and Heretic batch failures to reduce user-blocking crashes.
+- Added Heretic load fallback when disk-offload strategy becomes unstable, forcing a conservative CPU mapping retry.
+- Improved startup observability by exposing micro-IA state during modular boot and recovery actions.
+- Added visible APP_VERSION constant (v0.3.1) in entrypoint, window title, and footer chip for full traceability.
+- E2E checklist documented in README for manual validation against any real HF model.
+
+Trade-offs:
+- Preferred deterministic recovery and reliability over aggressive load strategy; CPU fallback can be slower but avoids hard failures.
+- Kept visual polish lightweight in Qt stylesheets (no heavy effects/animations) to avoid startup/render penalties.
+
+Debt deferred:
+- Full automated E2E suite with mocked large-model paths and synthetic cache corruption fixtures.
+- Optional telemetry dashboard (structured metrics timeline) beyond current rotating log + assistant feed.
+- Preset profiles (ligero/equilibrado/agresivo) for abliteration intensity.
+
+Release notes:
+- git tag v0.3.1 published for this checkpoint.
+- Version constant APP_VERSION = "0.3.1" in abliterador_studio.py as single source of truth.

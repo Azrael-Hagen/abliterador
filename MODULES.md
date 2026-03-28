@@ -34,6 +34,18 @@
 - Purpose: Main GUI orchestration and user interactions.
 - Public API: search_model(), apply_heretic(), generate_text().
 
+9. RuntimeEngine
+- Purpose: Declarative modular startup pipeline with weighted progress.
+- Public API: steps, total_weight.
+
+10. Auto-repair helpers
+- Purpose: Detect and remediate common runtime failures (HF cache locks, dependency drift, memory/network hints).
+- Public API: attempt_auto_repair(target, progress_callback).
+
+11. Advisor classifiers
+- Purpose: Classify runtime errors and map them to user-facing guidance + automatic recovery decisions.
+- Public API: classify_runtime_error(), humanize_runtime_error(), suggest_next_action().
+
 ## Reuse Rules
 - Any new long-running operation must be routed through ModelTaskWorker.
 - Any new generation controls must be added to GenerationSettings first.

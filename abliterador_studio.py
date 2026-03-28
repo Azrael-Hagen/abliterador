@@ -8,6 +8,8 @@ from PySide6.QtWidgets import QApplication
 from abliterador_app.services.logger import setup_app_logging
 from abliterador_app.ui.main_window import ModelSearcher
 
+APP_VERSION = "0.3.1"
+
 
 def main():
     logger = setup_app_logging()
@@ -21,8 +23,8 @@ def main():
     logo_path = Path(__file__).resolve().parent / "sources" / "Copilot_20260327_161839.png"
     if logo_path.exists():
         app.setWindowIcon(QIcon(str(logo_path)))
-    logger.info("Iniciando Abliterador Studio")
-    window = ModelSearcher()
+    logger.info("Iniciando Abliterador Studio v%s", APP_VERSION)
+    window = ModelSearcher(version=APP_VERSION)
     window.show()
     return app.exec()
 
