@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.4.0] - 2026-03-28 🚀 Distribution Release
+### Added
+- **Setup Infrastructure:** `setup.py` for pip installation support (all platforms).
+- **Modern Packaging:** `pyproject.toml` with PEP 517/518 build backend configuration.
+- **Dependency Pinning:** `requirements.txt` with exact versions for reproducible builds.
+- **Executable Builder:** `build_installer.py` script to generate standalone executables via PyInstaller.
+  - Supports Windows (.exe), macOS, and Linux binaries
+  - One-file and directory-bundle modes
+  - No Python installation required on target systems
+- **Installation Guide:** `INSTALLATION.md` with step-by-step instructions for all platforms.
+- **Cross-platform Support:** Verified builds for Windows 10+, macOS 10.14+, Linux (Ubuntu 18.04+, Debian 11+).
+- **GitHub Release Assets:** Pre-built executables for Windows, macOS, and Linux.
+
+### Changed
+- README updated with references to INSTALLATION.md and executable downloads.
+- Project version bumped to 0.4.0 (MINOR: distribution features don't change existing flows).
+- Windows launcher (launch_abliterador_studio.bat) now references official release notes.
+
+### Fixed
+- Model auto-replacement bug on CPU-only systems (from v0.3.1) fully tested before release.
+- Download cancellation and model deletion features validated across all backends.
+
+### Infrastructure
+- Prepared CI/CD hooks for automated executable builds on release tags.
+- Validated dependency tree for cross-architecture compatibility (x86_64, ARM64 ready for macOS).
+
+---
+
 ## [0.3.1] - 2026-03-28
 ### Added
 - Resilient HF download flow with transient-network retry backoff and post-download integrity validation.

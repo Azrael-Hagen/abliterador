@@ -1,5 +1,40 @@
 # Engineer Log
 
+## [CP-04/Distribution] 2026-03-28
+Status: Passed
+Decisions made:
+- **Distribution Strategy:** Chose multi-tier approach for maximum adoption:
+  1. Pre-built executables via GitHub Releases (zero-config for end users)
+  2. pip installation from PyPI (for dev/integration use)
+  3. Source + requirements.txt (for developers and CI/CD)
+  4. Build script for custom executables (PyInstaller)
+
+- **Dependency Pinning:** Used exact versions in requirements.txt for reproducible builds across systems/architects; setup.py allows flexible ranges for dev installs.
+
+- **Setup.py + pyproject.toml:** Modern dual-layer configuration (backcompat + PEP 517) for compatibility with older pip versions and future PyPI submission.
+
+- **PyInstaller Spec:** Chose onedir + onefile modes to balance portability and distribution size. Hidden imports configured for heretic, transformers, and torch.
+
+- **Documentation:** Consolidated installation paths into INSTALLATION.md (4 options) with troubleshooting and security notes.
+
+- **Versioning Bump:** v0.3.1 → v0.4.0 (MINOR: new distribution infrastructure, no breaking GUI changes).
+
+Trade-offs:
+- PyInstaller executables are large (~350-400MB) to avoid requiring Python on target systems; acceptable for GUI apps.
+- Cross-compilation (e.g., Windows exe from Linux) not supported; each platform builds on that platform.
+- CI/CD automation for release builds deferred to next sprint (manual builds for now).
+
+Debt deferred:
+- Automated GitHub Actions workflow to build + sign + upload executables on tag push.
+- MSI installer for Windows (WiX toolset integration).
+- macOS code signing and notarization for production App Store compliance.
+- Auto-update mechanism for distributed executables.
+
+Next steps:
+- Commit and push distribution files to main.
+- Create GitHub Release v0.4.0 with pre-built executables (manual build on each platform).
+- Update project wiki with release notes and upgrade instructions.
+
 ## [CP-01] 2026-03-26
 Status: In progress
 Decisions made:

@@ -1,0 +1,27 @@
+# Abliterador Studio - Dependency Pinning
+# Python 3.10+
+# This file pins exact versions for reproducible builds across systems
+
+# Core GUI Framework
+PySide6==6.7.1
+
+# ML/Transformers
+transformers==4.45.2
+torch==2.3.1
+numpy==1.24.3
+safetensors==0.4.3
+
+# Hugging Face Integration
+huggingface-hub==0.23.5
+requests==2.32.3
+
+# Abliteration Backend
+# Note: heretic-llm provides modern abliteration capabilities
+heretic-llm==0.1.2
+
+# Utilities
+python-dotenv==1.0.1
+pydantic==2.8.2
+
+# Build & Packaging (dev only, not needed in production)
+# PyInstaller==6.10.0 (install separately with `pip install -e .[dev]`)

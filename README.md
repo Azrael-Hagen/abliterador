@@ -1,14 +1,34 @@
 # Abliterador Studio
 
-**Versión:** `v0.3.1` — *2026-03-28*
+**Versión:** `v0.4.0` — *2026-03-28* 🚀
 
 Aplicacion GUI en PySide6 para buscar modelos, cargarlos localmente, aplicar abliteración y probar generacion de texto.
+
+### 📥 Instalación Rápida
+
+**La forma más fácil: Descarga el ejecutable**
+- Ve a [Releases](https://github.com/Azrael-Hagen/abliterador/releases)
+- Descarga `AbliteradorStudio_vX.X.X_[SistemaOperativo].zip`
+- No requiere Python instalado ✅
+
+**O instala desde código fuente:**
+```bash
+git clone https://github.com/Azrael-Hagen/abliterador.git
+cd abliterador
+pip install -r requirements.txt
+python abliterador_studio.py
+```
+
+👉 **[Ver guía completa de instalación →](INSTALLATION.md)**
+
+---
 
 ## Historial de versiones resumido
 
 | Versión | Fecha | Cambios principales |
 |---------|-------|---------------------|
-| `0.3.1` | 2026-03-28 | Descarga HF resiliente con reintentos/backoff, auto-recuperación en worker, chip Micro IA durante arranque, fallback CPU para disk-offload Heretic |
+| `0.4.0` | 2026-03-28 | **Distribución profesional:** setup.py, pyproject.toml, PyInstaller, ejecutables precompilados, INSTALLATION.md 🎁 |
+| `0.3.1` | 2026-03-28 | Descarga HF resiliente con reintentos/backoff, auto-recuperación en worker, chip Micro IA durante arranque |
 | `0.3.0` | 2026-03-26 | Paquete modular (domain/services/ui), integración real Heretic, factory de backends, GUI profesional |
 | `0.2.0` | 2026-03-26 | Worker QThread, controles de generación (tokens, temp, top-p), validaciones de entrada |
 | `0.1.0` | 2026-03-26 | Baseline arquitectural: CHECKPOINTS, MODULES, VERSIONING, ENGINEER_LOG |
@@ -16,17 +36,43 @@ Aplicacion GUI en PySide6 para buscar modelos, cargarlos localmente, aplicar abl
 ## Objetivo
 Permitir experimentacion local con modelos usando una interfaz simple y segura, priorizando responsividad de GUI y validaciones claras.
 
+## 📦 Cómo Instalar
+
+### Opción 1️⃣: Ejecutable (No requiere Python)
+```
+Página de Releases → Descargar ZIP → Descomprimir → Ejecutar
+```
+
+### Opción 2️⃣: Desde código fuente (Desarrollo)
+```bash
+git clone https://github.com/Azrael-Hagen/abliterador.git
+cd abliterador
+pip install -r requirements.txt
+python abliterador_studio.py
+```
+
+### Opción 3️⃣: Ser instalado con pip
+```bash
+pip install -e .                # Develop mode
+pip install abliterador-studio  # (After PyPI submission)
+```
+
+### Opción 4️⃣: Compilar tu propio ejecutable
+```bash
+pip install -e ".[dev]"
+python build_installer.py
+```
+
+👉 **[Instrucciones detalladas para cada opción →](INSTALLATION.md)**
+
+---
+
 ## Dependencias
-- Python 3.10+
+
+### Runtime (Automáticas con cualquier instalación)
 - PySide6
 - transformers
 - heretic-llm (paquete que expone el módulo heretic moderno)
-
-Instalacion sugerida:
-
-pip install PySide6 transformers heretic-llm
-
-Nota importante sobre Heretic:
 - La app usa backend heretic moderno como primera opción para abliteración real.
 - Si ese backend falla, intenta compatibilidad legacy con heretic_llm.
 - Como último recurso usa fallback de transformers para mantener operatividad (sin abliteración real).

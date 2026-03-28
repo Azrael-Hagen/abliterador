@@ -1,0 +1,96 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "abliterador-studio"
+version = "0.4.0"
+description = "GUI application for local LLM model loading, abliteration, and text generation"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Azrael", email = ""},
+]
+requires-python = ">=3.10"
+keywords = ["LLM", "abliteration", "transformers", "heretic", "GUI", "Qt", "PySide6"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: X11 Applications :: Qt",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Natural Language :: Spanish",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "PySide6>=6.7.0",
+    "transformers>=4.40.0",
+    "torch>=2.0.0",
+    "numpy>=1.24.0",
+    "safetensors>=0.4.0",
+    "huggingface-hub>=0.20.0",
+    "requests>=2.31.0",
+    "heretic-llm>=0.1.0",
+    "python-dotenv>=1.0.0",
+    "pydantic>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "PyInstaller>=6.10.0",
+    "pytest>=7.0.0",
+    "black>=23.0.0",
+    "flake8>=6.0.0",
+    "mypy>=1.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/Azrael-Hagen/abliterador"
+Documentation = "https://github.com/Azrael-Hagen/abliterador#readme"
+Repository = "https://github.com/Azrael-Hagen/abliterador"
+"Bug Tracker" = "https://github.com/Azrael-Hagen/abliterador/issues"
+
+[project.scripts]
+# After installation, users can run: abliterador-studio from command line
+abliterador-studio = "abliterador_studio:main"
+
+[tool.setuptools]
+packages = ["abliterador_app", "abliterador_app.domain", "abliterador_app.services", "abliterador_app.ui"]
+
+[tool.black]
+line-length = 88
+target-version = ["py310", "py311", "py312"]
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+  | downloads_models
+  | \.hf_cache
+)/
+'''
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+disallow_untyped_defs = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
