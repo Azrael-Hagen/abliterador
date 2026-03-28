@@ -166,8 +166,11 @@ class ModelSearcher(QWidget):
             return
 
         geo = screen.availableGeometry()
-        target_w = max(self.minimumWidth(), min(1320, int(geo.width() * 0.94)))
-        target_h = max(self.minimumHeight(), min(940, int(geo.height() * 0.90)))
+        safe_w = max(self.minimumWidth(), geo.width() - 40)
+        safe_h = max(self.minimumHeight(), geo.height() - 70)
+
+        target_w = max(self.minimumWidth(), min(1320, int(geo.width() * 0.92), safe_w))
+        target_h = max(self.minimumHeight(), min(940, int(geo.height() * 0.86), safe_h))
         self.resize(target_w, target_h)
 
         center_x = geo.x() + (geo.width() - target_w) // 2

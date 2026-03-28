@@ -287,8 +287,25 @@ class ModernHereticBackend(BaseAbliterationBackend):
 
     def _build_settings(self, model_name: str, settings: GenerationSettings):
         source, _cache_dir, _model_dir = _resolve_hf_model_source(model_name)
+        # Heretic defaults batch_size=0, which breaks batchify(range step=0). Keep it always >= 1.
+        safe_batch_size = 1
+
+        # Favor CPU map on systems without a discrete GPU to avoid fragile full-disk offload paths.
+        device_map = "auto"
+        max_memory = None
+        try:
+            import torch
+
+            if not torch.cuda.is_available():
+                device_map = "cpu"
+        except Exception:
+            device_map = "cpu"
+
         return self.settings_cls(
             model=source,
+            batch_size=safe_batch_size,
+            device_map=device_map,
+            max_memory=max_memory,
             max_response_length=max(16, settings.max_new_tokens),
             print_responses=False,
             orthogonalize_direction=True,

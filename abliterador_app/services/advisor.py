@@ -159,6 +159,15 @@ def classify_runtime_error(error_message: str) -> dict:
             "retry": True,
         }
 
+    if "range() arg 3 must not be zero" in low or "batch_size" in low:
+        return {
+            "category": "heretic_config",
+            "target": "heretic",
+            "assistant_message": "Detecté una configuración inválida en Heretic (batch). Aplicaré recuperación y reintento.",
+            "visible_state": "corrigiendo configuracion heretic",
+            "retry": True,
+        }
+
     if "huggingface-cli no encontrado" in low or "huggingface_hub" in low:
         return {
             "category": "hf_dependency",
@@ -241,6 +250,13 @@ def humanize_runtime_error(error_message: str) -> dict:
             "title": "Error de backend Heretic",
             "summary": "El backend Heretic no pudo inicializar o completar la operación.",
             "hint": "La app intentará auto-reparación; si falla, revisa dependencias heretic/torch.",
+        }
+
+    if category == "heretic_config":
+        return {
+            "title": "Configuración Heretic inválida",
+            "summary": "Se detectó un parámetro interno inválido de Heretic (batch).",
+            "hint": "La app intentará corregir la configuración automáticamente y reintentar.",
         }
 
     if category == "model_incomplete":
