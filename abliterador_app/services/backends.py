@@ -287,6 +287,7 @@ class ModernHereticBackend(BaseAbliterationBackend):
         self.prompt_cls = prompt_cls
         self.abliteration_parameters_cls = abliteration_parameters_cls
 
+        self._emit = lambda msg: None  # replaced by worker via set_emit_callback
         self.system_prompt = "You are a helpful assistant."
         self.good_prompt_texts = [
             "Escribe una explicación breve sobre la fotosíntesis.",
@@ -347,6 +348,29 @@ class ModernHereticBackend(BaseAbliterationBackend):
             )
         return params
 
+    @staticmethod
+    def _model_already_abliterated(model_name: str) -> bool:
+        """Return True when the model name itself signals it is already abliterated."""
+        lower = model_name.lower()
+        return "abliterat" in lower
+
+    def _calibration_prompts(self) -> tuple[list, list]:
+        """
+        Return (good_prompts, bad_prompts).
+        On CPU-only systems use 2+2 to avoid hour-long forward passes.
+        """
+        is_cpu_only = True
+        try:
+            import torch
+            is_cpu_only = not torch.cuda.is_available()
+        except Exception:
+            pass
+
+        limit = 2 if is_cpu_only else len(self.good_prompt_texts)
+        good = [self._build_prompt(t) for t in self.good_prompt_texts[:limit]]
+        bad = [self._build_prompt(t) for t in self.bad_prompt_texts[:limit]]
+        return good, bad
+
     def load_and_abliterate(self, model_name: str, prompt: str, settings: GenerationSettings) -> str:
         runtime_settings = self._build_settings(model_name, settings)
         try:
@@ -360,8 +384,22 @@ class ModernHereticBackend(BaseAbliterationBackend):
             else:
                 raise
 
-        good_prompts = [self._build_prompt(text) for text in self.good_prompt_texts]
-        bad_prompts = [self._build_prompt(text) for text in self.bad_prompt_texts]
+        # Skip residual computation for models that are already abliterated.
+        # Re-calculating residuals and orthogonalizing an already-abliterated model wastes
+        # potentially hours of CPU time and offers no benefit.
+        if self._model_already_abliterated(model_name):
+            self._emit(
+                "[Heretic] Modelo ya abliterado detectado — se omite paso de cálculo de residuales"
+            )
+            self.model = model
+            return self.generate(prompt, settings)
+
+        good_prompts, bad_prompts = self._calibration_prompts()
+
+        self._emit(
+            f"[Heretic] Calculando residuales con {len(good_prompts)} prompts neutros "
+            f"y {len(bad_prompts)} prompts de rechazo (puede tardar en CPU)..."
+        )
 
         good_residuals = model.get_residuals_batched(good_prompts)
         bad_residuals = model.get_residuals_batched(bad_prompts)
@@ -378,6 +416,7 @@ class ModernHereticBackend(BaseAbliterationBackend):
         components = model.get_abliterable_components()
         params = self._default_abliteration_params(last_layer_index, components)
 
+        self._emit("[Heretic] Aplicando ortogonalización a capas del modelo...")
         model.abliterate(refusal_directions, None, params)
         self.model = model
 

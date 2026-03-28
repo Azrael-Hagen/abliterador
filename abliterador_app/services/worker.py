@@ -209,9 +209,19 @@ class ModelTaskWorker(QObject):
 
                 self.progress.emit(f"Cargando modelo: {task.model_name}...")
                 self.backend = create_backend(task.model_name, task.preferred_backend)
+                # Wire progress channel into backends that support it.
+                if hasattr(self.backend, '_emit'):
+                    self.backend._emit = self.progress.emit
                 self.progress.emit(f"Backend activo: {self.backend.backend_name}")
                 if self.backend.supports_abliteration:
-                    self.progress.emit("Aplicando abliteración...")
+                    model_lower = task.model_name.lower()
+                    if "abliterat" in model_lower:
+                        self.progress.emit(
+                            "ℹ️ Este modelo ya ha sido abliterado previamente. "
+                            "Se omitirá el paso de cálculo de residuales para evitar bloqueos en CPU."
+                        )
+                    else:
+                        self.progress.emit("Aplicando abliteración...")
                 else:
                     self.progress.emit(
                         "Nota: este backend no aplica abliteración real; se usa para pruebas de generación local."
