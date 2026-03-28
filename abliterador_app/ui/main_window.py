@@ -1,9 +1,10 @@
 from datetime import datetime
 from html import escape
+from pathlib import Path
 import re
 
 from PySide6.QtCore import QThread, Qt, Signal, Slot
-from PySide6.QtGui import QFont, QGuiApplication, QTextCursor
+from PySide6.QtGui import QFont, QGuiApplication, QIcon, QPixmap, QTextCursor
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -27,7 +28,7 @@ from PySide6.QtWidgets import (
 )
 
 from abliterador_app.domain.models import GenerationSettings, WorkerTask
-from abliterador_app.services.advisor import build_assistant_reply, classify_runtime_error
+from abliterador_app.services.advisor import build_assistant_reply, classify_runtime_error, suggest_next_action
 from abliterador_app.services.backends import (
     BACKEND_MODE_AUTO,
     BACKEND_MODE_FALLBACK,
@@ -49,6 +50,9 @@ class ModelSearcher(QWidget):
         super().__init__()
         self.setWindowTitle("Abliterador Studio")
         self.setMinimumSize(980, 680)
+        self._logo_path = self._resolve_logo_path()
+        if self._logo_path is not None:
+            self.setWindowIcon(QIcon(str(self._logo_path)))
 
         self.model_ready = False
         self.current_model_name = ""
@@ -81,12 +85,26 @@ class ModelSearcher(QWidget):
         root_layout.setContentsMargins(20, 16, 20, 16)
         root_layout.setSpacing(10)
 
+        header_row = QHBoxLayout()
+        if self._logo_path is not None:
+            logo_label = QLabel()
+            logo_pixmap = QPixmap(str(self._logo_path))
+            logo_label.setPixmap(logo_pixmap.scaled(76, 76, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            logo_label.setObjectName("headerLogo")
+            header_row.addWidget(logo_label)
+
+        title_box = QVBoxLayout()
+        title_box.setSpacing(2)
+
         title = QLabel("Abliterador Studio")
         title.setObjectName("titleLabel")
         subtitle = QLabel("Interfaz guiada para descargar, abliterar y probar modelos con asistencia inteligente")
         subtitle.setObjectName("subtitleLabel")
-        root_layout.addWidget(title)
-        root_layout.addWidget(subtitle)
+        title_box.addWidget(title)
+        title_box.addWidget(subtitle)
+
+        header_row.addLayout(title_box, 1)
+        root_layout.addLayout(header_row)
 
         self.steps_bar = QLabel("Paso 1 Modelo  |  Paso 2 Cargar/Abliterar  |  Paso 3 Generar")
         self.steps_bar.setObjectName("stepsLabel")
@@ -243,6 +261,10 @@ class ModelSearcher(QWidget):
         self.clear_button = QPushButton("Limpiar salida")
         self.clear_button.clicked.connect(self.output_area_clear)
         action_row.addWidget(self.clear_button)
+
+        self.smart_action_button = QPushButton("Siguiente accion inteligente")
+        self.smart_action_button.clicked.connect(self.run_smart_next_action)
+        action_row.addWidget(self.smart_action_button)
         action_row.addStretch(1)
         generation_layout.addLayout(action_row)
 
@@ -506,14 +528,14 @@ class ModelSearcher(QWidget):
         self.setStyleSheet(
             """
             QWidget {
-                background: #0d1117;
+                background: #090d14;
                 color: #e7edf3;
             }
             QGroupBox {
-                border: 1px solid #273240;
+                border: 1px solid #29384a;
                 border-radius: 16px;
                 margin-top: 14px;
-                background: #141b23;
+                background: #101723;
                 font-weight: 700;
             }
             QGroupBox::title {
@@ -525,13 +547,13 @@ class ModelSearcher(QWidget):
             QLineEdit, QTextEdit, QComboBox, QSpinBox, QDoubleSpinBox, QListWidget {
                 border: 1px solid #283443;
                 border-radius: 12px;
-                background: #0c1218;
+                background: #0b131d;
                 color: #e7edf3;
                 padding: 8px;
-                selection-background-color: #214936;
+                selection-background-color: #1e5f8f;
             }
             QLineEdit:focus, QTextEdit:focus, QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus {
-                border: 1px solid #67c98c;
+                border: 1px solid #ff8f33;
             }
             QListWidget::item:selected {
                 background: #1c2733;
@@ -542,15 +564,15 @@ class ModelSearcher(QWidget):
                 background: #151e27;
             }
             QPushButton {
-                background: #73d98a;
-                color: #092012;
-                border: 1px solid #97e9a9;
+                background: #ff8a2b;
+                color: #1e0f06;
+                border: 1px solid #ffae64;
                 border-radius: 12px;
                 padding: 9px 14px;
                 font-weight: 700;
             }
             QPushButton:hover {
-                background: #8be7a0;
+                background: #ff9f4e;
             }
             QPushButton:disabled {
                 background: #40505f;
@@ -559,35 +581,39 @@ class ModelSearcher(QWidget):
             }
             #titleLabel {
                 font-size: 30px;
-                color: #f4f7f8;
+                color: #f7fbff;
                 font-weight: 800;
             }
+            #headerLogo {
+                background: transparent;
+                padding-right: 10px;
+            }
             #subtitleLabel {
-                color: #8fa2b4;
+                color: #8bb9d8;
                 margin-bottom: 4px;
             }
             #stepsLabel {
-                background: #121922;
-                border: 1px solid #25313d;
+                background: #101923;
+                border: 1px solid #274059;
                 border-radius: 14px;
                 padding: 10px 14px;
-                color: #cfdae4;
+                color: #dbe9f5;
                 font-weight: 700;
             }
             #statusLabel {
-                background: #132118;
-                border: 1px solid #356e4e;
+                background: #1f2e3d;
+                border: 1px solid #2d6998;
                 border-radius: 12px;
                 padding: 6px 10px;
-                color: #c4f4d4;
+                color: #c9e7ff;
                 font-weight: 700;
             }
             #extensionsLabel {
-                background: #111821;
-                border: 1px solid #24313d;
+                background: #111b27;
+                border: 1px solid #23435f;
                 border-radius: 12px;
                 padding: 6px 10px;
-                color: #a3b7c8;
+                color: #abc8df;
             }
             #hwLabel {
                 background: #102027;
@@ -624,18 +650,18 @@ class ModelSearcher(QWidget):
                 color: #afc0ce;
             }
             #chipOk {
-                background: #122419;
-                border: 1px solid #2c6d44;
+                background: #1f2f3f;
+                border: 1px solid #2d668f;
                 border-radius: 11px;
                 padding: 3px 8px;
-                color: #a5f0ba;
+                color: #c8e8ff;
             }
             #chipWarn {
-                background: #2a1c0e;
-                border: 1px solid #7a562d;
+                background: #2f1f10;
+                border: 1px solid #ad6e2e;
                 border-radius: 11px;
                 padding: 3px 8px;
-                color: #ffd493;
+                color: #ffd7a4;
             }
             #assistantOutput, #outputFeed, #abliterationInfoLabel, #modelChatOutput {
                 background: #0b1015;
@@ -672,11 +698,11 @@ class ModelSearcher(QWidget):
                 color: #b9c8d5;
             }
             #outputMetaChipActive {
-                background: #15261b;
-                border: 1px solid #347351;
+                background: #26384a;
+                border: 1px solid #2f6b95;
                 border-radius: 12px;
                 padding: 4px 10px;
-                color: #c1f4d0;
+                color: #d1ebff;
                 font-weight: 700;
             }
             QTabWidget::pane {
@@ -695,9 +721,9 @@ class ModelSearcher(QWidget):
                 font-weight: 700;
             }
             QTabBar::tab:selected {
-                background: #17212b;
+                background: #182a3d;
                 color: #eff4f7;
-                border-color: #2f3e4d;
+                border-color: #2f5370;
             }
             QScrollBar:vertical {
                 background: #10161d;
@@ -714,6 +740,11 @@ class ModelSearcher(QWidget):
             }
             """
         )
+
+    def _resolve_logo_path(self) -> Path | None:
+        base_dir = Path(__file__).resolve().parents[2]
+        candidate = base_dir / "sources" / "Copilot_20260327_161839.png"
+        return candidate if candidate.exists() else None
 
     def _selected_backend_mode(self):
         return self.backend_selector.currentData()
@@ -1071,7 +1102,42 @@ class ModelSearcher(QWidget):
             "selected_model": self._current_selected_model_name() or "",
             "model_ready": self.model_ready,
             "top_recommended": top_recommended,
+            "prompt": self.prompt_input.toPlainText().strip(),
+            "incomplete_hf_models": list(self._incomplete_hf_models),
         }
+
+    def run_smart_next_action(self):
+        plan = suggest_next_action(self._assistant_context())
+        action = plan.get("action", "")
+        message = plan.get("message", "")
+        target_model = (plan.get("model_name") or "").strip()
+
+        if message:
+            self._assistant_append(f"Siguiente accion inteligente: {message}")
+        self._assistant_set_recovery_state("asistencia activa", action or "sin accion")
+
+        if action == "repair_incomplete_download" and target_model:
+            self._catalog_download_by_name(target_model)
+            return
+
+        if action == "select_recommended_model" and target_model:
+            self._catalog_use_by_name(target_model)
+            return
+
+        if action == "load_selected_model":
+            self.apply_heretic()
+            return
+
+        if action == "set_default_prompt":
+            self.prompt_input.setPlainText(self.default_prompt_v1())
+            self.generate_text()
+            return
+
+        if action == "generate_now":
+            self.generate_text()
+            return
+
+        self.load_catalog()
 
     def _pick_preferred_hf_model_name(self) -> str | None:
         for model, reason in self._catalog_recommendations:

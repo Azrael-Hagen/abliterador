@@ -71,6 +71,53 @@ def build_assistant_reply(question: str, context: dict) -> str:
     )
 
 
+def suggest_next_action(context: dict) -> dict:
+    """Return an actionable next-step recommendation for the current app state."""
+    selected_model = (context.get("selected_model") or "").strip()
+    model_ready = bool(context.get("model_ready", False))
+    prompt_present = bool((context.get("prompt") or "").strip())
+    top_recommended = context.get("top_recommended", [])
+    incomplete_hf_models = context.get("incomplete_hf_models", [])
+
+    if incomplete_hf_models:
+        model_name = incomplete_hf_models[0]
+        return {
+            "action": "repair_incomplete_download",
+            "message": f"Recuperar descarga incompleta de: {model_name}",
+            "model_name": model_name,
+        }
+
+    if not selected_model and top_recommended:
+        return {
+            "action": "select_recommended_model",
+            "message": f"Seleccionar mejor recomendado: {top_recommended[0]}",
+            "model_name": top_recommended[0],
+        }
+
+    if selected_model and not model_ready:
+        return {
+            "action": "load_selected_model",
+            "message": f"Cargar y abliterar modelo seleccionado: {selected_model}",
+            "model_name": selected_model,
+        }
+
+    if model_ready:
+        if prompt_present:
+            return {
+                "action": "generate_now",
+                "message": "Generar respuesta con el modelo cargado.",
+            }
+        return {
+            "action": "set_default_prompt",
+            "message": "Cargar prompt sugerido y generar.",
+        }
+
+    return {
+        "action": "load_catalog",
+        "message": "Actualizar catálogo y contexto para continuar.",
+    }
+
+
 def classify_runtime_error(error_message: str) -> dict:
     """Classify backend/runtime errors and suggest auto-recovery action."""
     raw = (error_message or "").strip()
