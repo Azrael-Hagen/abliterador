@@ -10,3 +10,26 @@ downloaded_models/
 .env
 
 logs/
+
+# Build artifacts from PyInstaller / setup.py
+build/
+dist/
+*.egg-info/
+*.egg
+*.whl
+*.spec
+
+# IDE & OS
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Test artifacts
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
