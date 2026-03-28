@@ -8,6 +8,8 @@ from abliterador_app.services.backends import (
     is_hf_model_ready_local,
     list_incomplete_hf_models_local,
     search_downloadable_models,
+    BACKEND_MODE_AUTO,
+    BACKEND_MODE_HERETIC,
 )
 from abliterador_app.services.catalog import (
     get_hardware_profile,
@@ -15,6 +17,7 @@ from abliterador_app.services.catalog import (
 )
 from abliterador_app.services.backends import list_ollama_models
 from abliterador_app.services.self_heal import attempt_auto_repair
+from abliterador_app.services.logger import get_log_path, get_logger
 
 
 class ModelTaskWorker(QObject):
@@ -26,10 +29,47 @@ class ModelTaskWorker(QObject):
         super().__init__()
         self.backend = None
         self.loaded_model_name = ""
+        self.logger = get_logger()
 
     @Slot(object)
     def run_task(self, task: WorkerTask):
         try:
+            self.logger.info("Worker operation start: %s", task.operation)
+
+            if task.operation == "startup_probe":
+                self.progress.emit("Motor interno: escaneando extensiones...")
+                local_ollama = list_ollama_models()
+
+                heretic_ok = False
+                try:
+                    create_backend("", BACKEND_MODE_HERETIC)
+                    heretic_ok = True
+                except Exception:
+                    heretic_ok = False
+
+                auto_backend = "desconocido"
+                try:
+                    auto_backend = create_backend("", BACKEND_MODE_AUTO).backend_name
+                except Exception:
+                    pass
+
+                self.success.emit(
+                    {
+                        "operation": task.operation,
+                        "local_ollama": local_ollama,
+                        "heretic_ok": heretic_ok,
+                        "auto_backend": auto_backend,
+                        "log_path": get_log_path(),
+                    }
+                )
+                self.logger.info(
+                    "Startup probe done: ollama=%s heretic_ok=%s auto=%s",
+                    len(local_ollama),
+                    heretic_ok,
+                    auto_backend,
+                )
+                return
+
             if task.operation == "search_downloadable":
                 query = task.model_name.strip()
                 if not query:
@@ -42,6 +82,7 @@ class ModelTaskWorker(QObject):
                         "operation": task.operation,
                         "models": models,
                         "query": query,
+                        "log_path": get_log_path(),
                     }
                 )
                 return
@@ -61,6 +102,7 @@ class ModelTaskWorker(QObject):
                         "operation": task.operation,
                         "model_name": model_name,
                         "output": message,
+                        "log_path": get_log_path(),
                     }
                 )
                 return
@@ -76,6 +118,7 @@ class ModelTaskWorker(QObject):
                         "operation": task.operation,
                         "target": target,
                         "output": result.get("message", "Auto-reparación completada."),
+                        "log_path": get_log_path(),
                     }
                 )
                 return
@@ -99,6 +142,7 @@ class ModelTaskWorker(QObject):
                         "recommendations": recommendations,
                         "local_ollama": local_ollama,
                         "incomplete_hf": incomplete_hf,
+                        "log_path": get_log_path(),
                     }
                 )
                 return
@@ -137,6 +181,7 @@ class ModelTaskWorker(QObject):
                         "model_name": task.model_name,
                         "output": output,
                         "backend": self.backend.backend_name,
+                        "log_path": get_log_path(),
                     }
                 )
                 return
@@ -156,6 +201,7 @@ class ModelTaskWorker(QObject):
                         "model_name": self.loaded_model_name,
                         "output": output,
                         "backend": self.backend.backend_name,
+                        "log_path": get_log_path(),
                     }
                 )
                 return
@@ -163,4 +209,5 @@ class ModelTaskWorker(QObject):
             raise BackendError(f"Operación no soportada: {task.operation}")
 
         except Exception as exc:
+            self.logger.exception("Worker operation failed: %s", task.operation)
             self.error.emit(str(exc))

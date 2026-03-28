@@ -8,3 +8,5 @@ downloaded_models/
 
 .venv/
 .env
+
+logs/

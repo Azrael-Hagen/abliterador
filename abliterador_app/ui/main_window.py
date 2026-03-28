@@ -1,9 +1,11 @@
 from datetime import datetime
 from html import escape
+import os
 from pathlib import Path
 import re
+import subprocess
 
-from PySide6.QtCore import QThread, Qt, Signal, Slot
+from PySide6.QtCore import QThread, Qt, QTimer, Signal, Slot
 from PySide6.QtGui import QFont, QGuiApplication, QIcon, QPixmap, QTextCursor
 from PySide6.QtWidgets import (
     QApplication,
@@ -19,6 +21,7 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QMessageBox,
     QPushButton,
+    QProgressBar,
     QSpinBox,
     QStyle,
     QTabWidget,
@@ -28,7 +31,12 @@ from PySide6.QtWidgets import (
 )
 
 from abliterador_app.domain.models import GenerationSettings, WorkerTask
-from abliterador_app.services.advisor import build_assistant_reply, classify_runtime_error, suggest_next_action
+from abliterador_app.services.advisor import (
+    build_assistant_reply,
+    classify_runtime_error,
+    humanize_runtime_error,
+    suggest_next_action,
+)
 from abliterador_app.services.backends import (
     BACKEND_MODE_AUTO,
     BACKEND_MODE_FALLBACK,
@@ -38,6 +46,8 @@ from abliterador_app.services.backends import (
     list_ollama_models,
 )
 from abliterador_app.services.catalog import SOURCE_HUGGINGFACE, SOURCE_OLLAMA
+from abliterador_app.services.logger import get_log_path, get_logger
+from abliterador_app.services.runtime_engine import RuntimeEngine
 from abliterador_app.services.worker import ModelTaskWorker
 
 MODEL_NAME_ALLOWLIST = re.compile(r"^[a-zA-Z0-9._\-\/:]{3,128}$")
@@ -69,6 +79,15 @@ class ModelSearcher(QWidget):
         self._prefer_real_abliteration = True
         self._recovery_attempts: dict[str, int] = {}
         self._max_recovery_attempts = 2
+        self._extensions_heretic_ok = "?"
+        self._extensions_auto_name = "pendiente"
+        self._boot_engine = RuntimeEngine()
+        self._boot_step_index = -1
+        self._boot_completed_weight = 0
+        self._boot_waiting_operation = ""
+        self._boot_started = False
+        self._log_path = get_log_path()
+        self._logger = get_logger()
 
         self.worker_thread = QThread(self)
         self.worker = ModelTaskWorker()
@@ -110,6 +129,8 @@ class ModelSearcher(QWidget):
         self.steps_bar.setObjectName("stepsLabel")
         root_layout.addWidget(self.steps_bar)
 
+        self._build_startup_panel(root_layout)
+
         self.main_tabs = QTabWidget()
         self.main_tabs.setDocumentMode(True)
         root_layout.addWidget(self.main_tabs, 1)
@@ -133,11 +154,10 @@ class ModelSearcher(QWidget):
         self.setLayout(root_layout)
         self._fit_and_center_window()
 
-        self.load_ollama_models()
         self.refresh_extensions_status()
-        self.load_catalog()
         self._assistant_set_recovery_state("monitoreo activo", "Esperando eventos")
         self._assistant_append("Asistente listo. Puedo recomendarte modelos y siguiente paso.")
+        QTimer.singleShot(0, self._start_boot_sequence)
 
     def _fit_and_center_window(self):
         screen = QGuiApplication.primaryScreen()
@@ -157,6 +177,82 @@ class ModelSearcher(QWidget):
     def showEvent(self, event):
         super().showEvent(event)
         self._fit_and_center_window()
+
+    def _build_startup_panel(self, root_layout: QVBoxLayout):
+        self.startup_panel = QFrame()
+        self.startup_panel.setObjectName("outputHero")
+        startup_layout = QVBoxLayout(self.startup_panel)
+        startup_layout.setContentsMargins(14, 10, 14, 10)
+        startup_layout.setSpacing(6)
+
+        self.startup_title = QLabel("Inicializando motor interno...")
+        self.startup_title.setObjectName("outputHeroTitle")
+        startup_layout.addWidget(self.startup_title)
+
+        self.startup_detail = QLabel("Preparando módulos y diagnóstico del entorno")
+        self.startup_detail.setObjectName("outputHeroSubtitle")
+        self.startup_detail.setWordWrap(True)
+        startup_layout.addWidget(self.startup_detail)
+
+        self.startup_progress = QProgressBar()
+        self.startup_progress.setRange(0, 100)
+        self.startup_progress.setValue(0)
+        startup_layout.addWidget(self.startup_progress)
+
+        root_layout.addWidget(self.startup_panel)
+
+    def _start_boot_sequence(self):
+        if self._boot_started:
+            return
+        self._boot_started = True
+        self._set_busy(True)
+        self._append_output("▶ Inicio: secuencia de arranque modular")
+        self._run_next_boot_step()
+
+    def _run_next_boot_step(self):
+        self._boot_step_index += 1
+        steps = self._boot_engine.steps
+
+        if self._boot_step_index >= len(steps):
+            self._finish_boot_sequence()
+            return
+
+        step = steps[self._boot_step_index]
+        self.startup_title.setText(step.title)
+        self.startup_detail.setText(step.detail)
+        self._append_output(f"Proceso de inicio: {step.title}")
+
+        if step.operation:
+            self._boot_waiting_operation = step.operation
+            self.task_requested.emit(WorkerTask(operation=step.operation))
+            return
+
+        self._boot_completed_weight += step.weight
+        self._update_boot_progress()
+        QTimer.singleShot(20, self._run_next_boot_step)
+
+    def _update_boot_progress(self):
+        total = max(1, self._boot_engine.total_weight)
+        pct = int((self._boot_completed_weight / total) * 100)
+        self.startup_progress.setValue(max(0, min(100, pct)))
+
+    def _mark_boot_operation_completed(self, operation: str):
+        if operation != self._boot_waiting_operation:
+            return
+
+        step = self._boot_engine.steps[self._boot_step_index]
+        self._boot_completed_weight += step.weight
+        self._boot_waiting_operation = ""
+        self._update_boot_progress()
+        QTimer.singleShot(20, self._run_next_boot_step)
+
+    def _finish_boot_sequence(self):
+        self.startup_title.setText("Arranque completado")
+        self.startup_detail.setText("La interfaz está lista para trabajar.")
+        self.startup_progress.setValue(100)
+        self._append_output("✅ Motor interno listo")
+        self._set_busy(False)
+        QTimer.singleShot(500, lambda: self.startup_panel.setVisible(False))
 
     def _build_workflow_tab(self):
         self.tab_workflow = QWidget()
@@ -511,6 +607,14 @@ class ModelSearcher(QWidget):
         self.output_jump_button = QPushButton("Volver al flujo")
         self.output_jump_button.clicked.connect(lambda: self.main_tabs.setCurrentWidget(self.tab_workflow))
         output_actions.addWidget(self.output_jump_button)
+
+        self.output_open_log_button = QPushButton("Abrir log")
+        self.output_open_log_button.clicked.connect(self._open_log_file)
+        output_actions.addWidget(self.output_open_log_button)
+
+        self.output_copy_diag_button = QPushButton("Copiar diagnostico")
+        self.output_copy_diag_button.clicked.connect(self._copy_diagnostics)
+        output_actions.addWidget(self.output_copy_diag_button)
         output_actions.addStretch(1)
         box_layout.addLayout(output_actions)
 
@@ -759,20 +863,9 @@ class ModelSearcher(QWidget):
         self.refresh_extensions_status()
 
     def refresh_extensions_status(self):
-        try:
-            auto_backend = create_backend(self.search_input.text().strip(), BACKEND_MODE_AUTO)
-            auto_name = auto_backend.backend_name
-        except Exception:
-            auto_name = "desconocido"
-
-        heretic_ok = "Si"
-        try:
-            create_backend("", BACKEND_MODE_HERETIC)
-        except Exception:
-            heretic_ok = "No"
-
         self.extensions_label.setText(
-            f"Extensiones -> Heretic Real: {heretic_ok} | Ollama local: {len(self._ollama_models)} | Auto: {auto_name}"
+            f"Extensiones -> Heretic Real: {self._extensions_heretic_ok} | "
+            f"Ollama local: {len(self._ollama_models)} | Auto: {self._extensions_auto_name}"
         )
 
     def _populate_local_models(self):
@@ -797,6 +890,31 @@ class ModelSearcher(QWidget):
             return
         QApplication.clipboard().setText(text)
         self.status_label.setText("Salida copiada al portapapeles.")
+
+    def _open_log_file(self):
+        try:
+            if os.path.exists(self._log_path):
+                if os.name == "nt":
+                    os.startfile(self._log_path)
+                else:
+                    subprocess.Popen(["xdg-open", self._log_path])
+                self.status_label.setText("Log abierto en el sistema.")
+                return
+            self.status_label.setText("Log no encontrado todavía.")
+        except Exception as exc:
+            self._append_output(f"Error abriendo log: {exc}")
+
+    def _copy_diagnostics(self):
+        diag = (
+            f"Modelo activo: {self.current_model_name or 'ninguno'}\n"
+            f"Backend seleccionado: {self._selected_backend_mode()}\n"
+            f"Estado UI: {self.output_state_chip.text()}\n"
+            f"Log: {self._log_path}\n"
+            f"Modelo listo: {self.model_ready}\n"
+            f"Ollama local: {len(self._ollama_models)}"
+        )
+        QApplication.clipboard().setText(diag)
+        self.status_label.setText("Diagnóstico copiado al portapapeles.")
 
     def _clear_model_chat(self):
         self.model_chat_output.clear()
@@ -887,6 +1005,12 @@ class ModelSearcher(QWidget):
         self._append_feed(self.output_area, speaker, raw, tone)
         self.status_label.setText(raw.splitlines()[0][:120])
         if tone == "error":
+            self._logger.error(raw)
+        elif tone in {"action", "progress"}:
+            self._logger.info(raw)
+        else:
+            self._logger.info(raw)
+        if tone == "error":
             self._update_output_meta(state="error")
         elif tone in {"action", "progress"}:
             self._update_output_meta(state="trabajando")
@@ -913,6 +1037,8 @@ class ModelSearcher(QWidget):
         self.model_chat_send_button.setEnabled(not busy)
         self.model_chat_input.setEnabled(not busy)
         self.output_copy_button.setEnabled(not busy)
+        self.output_open_log_button.setEnabled(True)
+        self.output_copy_diag_button.setEnabled(True)
         self.output_jump_button.setEnabled(True)
         for button in self._catalog_card_buttons:
             button.setEnabled(not busy)
@@ -1415,6 +1541,24 @@ class ModelSearcher(QWidget):
         model_name = payload.get("model_name", "")
         output = payload.get("output", "")
         backend = payload.get("backend", "")
+        log_path = payload.get("log_path", "")
+
+        if log_path:
+            self._log_path = log_path
+
+        if operation == "startup_probe":
+            self._ollama_models = payload.get("local_ollama", [])
+            self._local_ollama_models = list(self._ollama_models)
+            self._populate_local_models()
+            self._extensions_heretic_ok = "Si" if payload.get("heretic_ok", False) else "No"
+            self._extensions_auto_name = payload.get("auto_backend", "desconocido")
+            self.refresh_extensions_status()
+            self._append_output(
+                "Startup probe: "
+                f"Ollama={len(self._ollama_models)} | Heretic={self._extensions_heretic_ok} | Auto={self._extensions_auto_name}"
+            )
+            self._mark_boot_operation_completed(operation)
+            return
 
         if operation == "load_abliterate":
             self.model_ready = True
@@ -1481,6 +1625,7 @@ class ModelSearcher(QWidget):
                 self._assistant_set_recovery_state("atención", "Modelos incompletos detectados")
             else:
                 self._assistant_set_recovery_state("estable", "Catalogo listo")
+            self._mark_boot_operation_completed(operation)
 
         if operation == "download_model":
             self._update_output_meta(state="modelo descargado", model=model_name)
@@ -1524,6 +1669,12 @@ class ModelSearcher(QWidget):
     @Slot(str)
     def _on_task_error(self, error_message):
         self._set_busy(False)
+        if self._boot_waiting_operation:
+            self.startup_title.setText("Arranque con incidencias")
+            self.startup_detail.setText("Se detectó un problema durante el inicio. Puedes continuar y revisar el log.")
+            self.startup_progress.setValue(max(self.startup_progress.value(), 75))
+            self._boot_waiting_operation = ""
+            QTimer.singleShot(1200, lambda: self.startup_panel.setVisible(False))
         self._update_output_meta(state="error")
         self._append_output(f"Error: {error_message}")
         self._assistant_set_recovery_state("error detectado", "Evaluando auto-recovery")
@@ -1531,7 +1682,14 @@ class ModelSearcher(QWidget):
         if recovered:
             return
         self._assistant_set_recovery_state("bloqueado", "Se requiere intervención manual")
-        QMessageBox.critical(self, "Error", f"No se pudo completar la operacion:\n{error_message}")
+        friendly = humanize_runtime_error(error_message)
+        msg = QMessageBox(self)
+        msg.setIcon(QMessageBox.Critical)
+        msg.setWindowTitle(friendly.get("title", "Error"))
+        msg.setText(friendly.get("summary", "No se pudo completar la operación."))
+        msg.setInformativeText(f"Sugerencia: {friendly.get('hint', 'Revisa el log y reintenta.')}\nLog: {self._log_path}")
+        msg.setDetailedText(error_message)
+        msg.exec()
 
     def closeEvent(self, event):
         self.worker_thread.quit()

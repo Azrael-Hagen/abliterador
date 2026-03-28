@@ -202,3 +202,56 @@ def classify_runtime_error(error_message: str) -> dict:
         "visible_state": "auto-reparando",
         "retry": False,
     }
+
+
+def humanize_runtime_error(error_message: str) -> dict:
+    diagnosis = classify_runtime_error(error_message)
+    category = diagnosis.get("category", "unknown")
+
+    if category == "hf_permissions_lock":
+        return {
+            "title": "Problema de permisos o bloqueo en cache",
+            "summary": "No se pudo acceder a la cache de Hugging Face. El sistema intentará limpiar locks y recuperar.",
+            "hint": "Si persiste, ejecuta la app como administrador o revisa permisos de la carpeta .hf_cache.",
+        }
+
+    if category == "network":
+        return {
+            "title": "Problema de red",
+            "summary": "La descarga o consulta al repositorio no respondió correctamente.",
+            "hint": "Revisa conexión, VPN/proxy y vuelve a intentar.",
+        }
+
+    if category == "disk":
+        return {
+            "title": "Espacio en disco insuficiente",
+            "summary": "No hay suficiente espacio para completar la descarga o cache del modelo.",
+            "hint": "Libera espacio y vuelve a intentar; los modelos grandes pueden requerir varios GB.",
+        }
+
+    if category == "memory":
+        return {
+            "title": "Memoria insuficiente",
+            "summary": "El modelo o generación superó la memoria disponible del sistema.",
+            "hint": "Reduce max tokens o usa un modelo más pequeño.",
+        }
+
+    if category == "heretic":
+        return {
+            "title": "Error de backend Heretic",
+            "summary": "El backend Heretic no pudo inicializar o completar la operación.",
+            "hint": "La app intentará auto-reparación; si falla, revisa dependencias heretic/torch.",
+        }
+
+    if category == "model_incomplete":
+        return {
+            "title": "Modelo incompleto",
+            "summary": "El modelo parece descargado parcialmente o con archivos faltantes.",
+            "hint": "Se recomienda relanzar la descarga para recuperar archivos faltantes.",
+        }
+
+    return {
+        "title": "Error de ejecución",
+        "summary": "Ocurrió un error no clasificado durante la operación.",
+        "hint": "Consulta el log para más detalles técnicos y vuelve a intentar.",
+    }
