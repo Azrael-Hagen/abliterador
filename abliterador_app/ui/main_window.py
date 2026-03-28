@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDoubleSpinBox,
+    QFileDialog,
     QFrame,
     QGroupBox,
     QHBoxLayout,
@@ -90,6 +91,8 @@ class ModelSearcher(QWidget):
         self._boot_started = False
         self._log_path = get_log_path()
         self._logger = get_logger()
+        self._download_in_progress = False
+        self._storage_locations: dict[str, str] = {}
 
         self.worker_thread = QThread(self)
         self.worker = ModelTaskWorker()
@@ -165,6 +168,7 @@ class ModelSearcher(QWidget):
         self._assistant_set_recovery_state("monitoreo activo", "Esperando eventos")
         self._assistant_append("Asistente listo. Puedo recomendarte modelos y siguiente paso.")
         QTimer.singleShot(0, self._start_boot_sequence)
+        QTimer.singleShot(0, self.refresh_storage_locations)
 
     def _fit_and_center_window(self):
         screen = QGuiApplication.primaryScreen()
@@ -305,6 +309,11 @@ class ModelSearcher(QWidget):
         self.search_input.setPlaceholderText("Filtrar modelos locales o escribir modelo manual (ej: meta-llama/...)")
         model_layout.addWidget(self.search_input)
 
+        self.storage_path_label = QLabel("Ubicación de descargas: detectando...")
+        self.storage_path_label.setObjectName("catalogCountLabel")
+        self.storage_path_label.setWordWrap(True)
+        model_layout.addWidget(self.storage_path_label)
+
         model_row = QHBoxLayout()
         self.search_button = QPushButton("Filtrar")
         self.search_button.clicked.connect(self.search_model)
@@ -317,6 +326,19 @@ class ModelSearcher(QWidget):
         self.download_button = QPushButton("Descargar seleccionado")
         self.download_button.clicked.connect(self.download_selected_model)
         model_row.addWidget(self.download_button)
+
+        self.cancel_download_button = QPushButton("Cancelar descarga")
+        self.cancel_download_button.clicked.connect(self.cancel_current_download)
+        self.cancel_download_button.setEnabled(False)
+        model_row.addWidget(self.cancel_download_button)
+
+        self.delete_model_button = QPushButton("Eliminar modelo local")
+        self.delete_model_button.clicked.connect(self.delete_selected_model)
+        model_row.addWidget(self.delete_model_button)
+
+        self.change_storage_button = QPushButton("Cambiar ubicación")
+        self.change_storage_button.clicked.connect(self.change_storage_location)
+        model_row.addWidget(self.change_storage_button)
         model_layout.addLayout(model_row)
 
         self.results_list = QListWidget()
@@ -1038,6 +1060,8 @@ class ModelSearcher(QWidget):
         self.search_downloadable_button.setEnabled(not busy)
         self.heretic_button.setEnabled(not busy)
         self.download_button.setEnabled(not busy)
+        self.delete_model_button.setEnabled(not busy)
+        self.change_storage_button.setEnabled(not busy)
         self.generate_button.setEnabled(not busy)
         self.reload_ollama_button.setEnabled(not busy)
         self._catalog_reload_btn.setEnabled(not busy)
@@ -1056,6 +1080,7 @@ class ModelSearcher(QWidget):
         self.output_open_log_button.setEnabled(True)
         self.output_copy_diag_button.setEnabled(True)
         self.output_jump_button.setEnabled(True)
+        self.cancel_download_button.setEnabled(self._download_in_progress)
         for button in self._catalog_card_buttons:
             button.setEnabled(not busy)
 
@@ -1396,6 +1421,7 @@ class ModelSearcher(QWidget):
         self._select_catalog_item_by_name(model_name)
         self._last_failed_operation = "download_model"
         self._last_failed_model = model_name
+        self._download_in_progress = True
         self.main_tabs.setCurrentWidget(self.tab_output)
         self._update_output_meta(state="descargando", model=model_name)
         self._append_output(f"\n▶ Iniciando descarga: {model_name}")
@@ -1454,10 +1480,57 @@ class ModelSearcher(QWidget):
             return
         self._last_failed_operation = "download_model"
         self._last_failed_model = model_name
+        self._download_in_progress = True
         self._set_busy(True)
         self.main_tabs.setCurrentWidget(self.tab_output)
         self._update_output_meta(state="descargando", model=model_name)
         self.task_requested.emit(WorkerTask(operation="download_model", model_name=model_name))
+
+    def cancel_current_download(self):
+        if not self._download_in_progress:
+            self._append_output("No hay descarga activa para cancelar.")
+            return
+        self.worker.cancel_download()
+        self._assistant_set_recovery_state("cancelando", "Cancelación solicitada por usuario")
+        self._append_output("▶ Cancelación solicitada. Cerrando descarga en curso...")
+
+    def delete_selected_model(self):
+        model_name = self._current_selected_model_name()
+        if not model_name:
+            QMessageBox.warning(self, "Error", "Selecciona un modelo para eliminar.")
+            return
+
+        answer = QMessageBox.question(
+            self,
+            "Confirmar eliminación",
+            f"¿Eliminar modelo local '{model_name}'?\n\nEsta acción no se puede deshacer.",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if answer != QMessageBox.Yes:
+            return
+
+        self._set_busy(True)
+        self.main_tabs.setCurrentWidget(self.tab_output)
+        self._update_output_meta(state="eliminando", model=model_name)
+        self.task_requested.emit(WorkerTask(operation="delete_model_local", model_name=model_name))
+
+    def change_storage_location(self):
+        selected_dir = QFileDialog.getExistingDirectory(
+            self,
+            "Selecciona carpeta base para descargas",
+            os.getcwd(),
+        )
+        if not selected_dir:
+            return
+
+        self._set_busy(True)
+        self.main_tabs.setCurrentWidget(self.tab_output)
+        self._update_output_meta(state="actualizando almacenamiento")
+        self.task_requested.emit(WorkerTask(operation="set_storage_base_dir", model_name=selected_dir))
+
+    def refresh_storage_locations(self):
+        self.task_requested.emit(WorkerTask(operation="get_storage_locations"))
 
     def apply_heretic(self):
         model_name = self._current_selected_model_name()
@@ -1646,6 +1719,8 @@ class ModelSearcher(QWidget):
             self._mark_boot_operation_completed(operation)
 
         if operation == "download_model":
+            self._download_in_progress = False
+            self.cancel_download_button.setEnabled(False)
             self._update_output_meta(state="modelo descargado", model=model_name)
             self._append_output(payload.get("output", "Descarga completada."))
             self.load_ollama_models()
@@ -1653,6 +1728,28 @@ class ModelSearcher(QWidget):
             self._last_failed_operation = ""
             self._last_failed_model = ""
             self._assistant_set_recovery_state("estable", "Descarga completada")
+
+        if operation == "delete_model_local":
+            self._update_output_meta(state="modelo eliminado", model=model_name)
+            self._append_output(payload.get("output", "Modelo eliminado."))
+            self.load_ollama_models()
+            self.load_catalog()
+            self._assistant_append("Eliminación completada. Catálogo actualizado.")
+
+        if operation == "set_storage_base_dir":
+            self._append_output(payload.get("output", "Ubicación actualizada."))
+            locations = payload.get("locations", {})
+            self._storage_locations = locations
+            models_dir = locations.get("models_dir", "")
+            self.storage_path_label.setText(f"Ubicación de descargas: {models_dir}")
+            self._assistant_append("Ubicación de descargas actualizada. Las nuevas descargas usarán esta carpeta.")
+            self.load_catalog()
+
+        if operation == "get_storage_locations":
+            locations = payload.get("locations", {})
+            self._storage_locations = locations
+            models_dir = locations.get("models_dir", "")
+            self.storage_path_label.setText(f"Ubicación de descargas: {models_dir}")
 
         if operation == "load_abliterate":
             self._last_failed_operation = ""
@@ -1686,6 +1783,8 @@ class ModelSearcher(QWidget):
 
     @Slot(str)
     def _on_task_error(self, error_message):
+        self._download_in_progress = False
+        self.cancel_download_button.setEnabled(False)
         self._set_busy(False)
         if self._boot_waiting_operation:
             self.startup_title.setText("Arranque con incidencias")

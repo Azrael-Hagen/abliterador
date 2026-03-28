@@ -1,4 +1,5 @@
 import inspect
+import json
 import os
 import re
 import shutil
@@ -40,8 +41,56 @@ class BackendError(RuntimeError):
     pass
 
 
+def _storage_config_path() -> str:
+    return os.path.join(os.getcwd(), "abliterador_config.json")
+
+
+def _read_storage_config() -> dict:
+    path = _storage_config_path()
+    if not os.path.isfile(path):
+        return {}
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            data = json.load(handle)
+        if isinstance(data, dict):
+            return data
+    except Exception:
+        pass
+    return {}
+
+
+def _write_storage_config(data: dict) -> None:
+    path = _storage_config_path()
+    with open(path, "w", encoding="utf-8") as handle:
+        json.dump(data, handle, indent=2, ensure_ascii=True)
+
+
+def get_storage_locations() -> dict:
+    cfg = _read_storage_config()
+    models_dir = cfg.get("models_dir") or os.path.join(os.getcwd(), "downloaded_models")
+    cache_dir = cfg.get("hf_cache_dir") or os.path.join(os.getcwd(), ".hf_cache")
+    return {
+        "models_dir": os.path.abspath(models_dir),
+        "hf_cache_dir": os.path.abspath(cache_dir),
+    }
+
+
+def set_storage_base_dir(base_dir: str) -> dict:
+    base = os.path.abspath(base_dir)
+    models_dir = os.path.join(base, "downloaded_models")
+    cache_dir = os.path.join(base, ".hf_cache")
+    os.makedirs(models_dir, exist_ok=True)
+    os.makedirs(cache_dir, exist_ok=True)
+
+    cfg = _read_storage_config()
+    cfg["models_dir"] = models_dir
+    cfg["hf_cache_dir"] = cache_dir
+    _write_storage_config(cfg)
+    return {"models_dir": models_dir, "hf_cache_dir": cache_dir}
+
+
 def _workspace_hf_cache_dir() -> str:
-    cache_dir = os.path.join(os.getcwd(), ".hf_cache")
+    cache_dir = get_storage_locations()["hf_cache_dir"]
     os.makedirs(cache_dir, exist_ok=True)
     return cache_dir
 
@@ -582,7 +631,7 @@ def _decode_repo_path_component(name: str) -> str:
 
 def _local_hf_paths(repo_id: str) -> tuple[str, str]:
     cache_dir = _workspace_hf_cache_dir()
-    model_dir = os.path.join(os.getcwd(), "downloaded_models", _safe_repo_path_component(repo_id))
+    model_dir = os.path.join(get_storage_locations()["models_dir"], _safe_repo_path_component(repo_id))
     os.makedirs(cache_dir, exist_ok=True)
     os.makedirs(model_dir, exist_ok=True)
     return cache_dir, model_dir
@@ -616,6 +665,7 @@ def search_downloadable_models(query: str, limit: int = 20) -> list[str]:
 def download_model(
     model_name: str,
     progress_callback=None,
+    cancel_check=None,
 ) -> str:
     """
     Descarga un modelo con progreso informativo.
@@ -629,10 +679,15 @@ def download_model(
         if progress_callback:
             progress_callback(msg)
 
+    def is_cancelled() -> bool:
+        return bool(cancel_check and cancel_check())
+
     normalized = _normalize_ollama_model_name(model_name)
     is_ollama = model_name.startswith("ollama/") or ":" in normalized
 
     if is_ollama:
+        if is_cancelled():
+            raise BackendError("Descarga cancelada por el usuario.")
         emit(f"Iniciando descarga Ollama: {normalized}")
         try:
             process = subprocess.Popen(
@@ -645,6 +700,9 @@ def download_model(
             )
             last_line = ""
             for line in process.stdout:
+                if is_cancelled():
+                    process.terminate()
+                    raise BackendError("Descarga cancelada por el usuario.")
                 clean = _clean_line(line)
                 if clean and clean != last_line:
                     emit(clean)
@@ -662,6 +720,8 @@ def download_model(
         return f"Modelo descargado en Ollama: {normalized}"
 
     # ── Hugging Face: estrategia resiliente con auto-reparación ─────────────
+    if is_cancelled():
+        raise BackendError("Descarga cancelada por el usuario.")
     emit(f"Iniciando descarga desde Hugging Face: {model_name}")
     cache_dir, model_dir = _local_hf_paths(model_name)
     cleaned = _cleanup_hf_partial_artifacts(cache_dir, model_dir)
@@ -691,6 +751,9 @@ def download_model(
         )
         last_line = ""
         for line in process.stdout:
+            if is_cancelled():
+                process.terminate()
+                raise BackendError("Descarga cancelada por el usuario.")
             line = line.rstrip()
             if line and line != last_line:
                 emit(line)
@@ -712,6 +775,8 @@ def download_model(
         from huggingface_hub import snapshot_download
 
         for attempt in range(1, 4):
+            if is_cancelled():
+                raise BackendError("Descarga cancelada por el usuario.")
             try:
                 local_path = snapshot_download(
                     repo_id=model_name,
@@ -787,7 +852,7 @@ def download_model(
 
 
 def list_incomplete_hf_models_local() -> list[str]:
-    base_dir = os.path.join(os.getcwd(), "downloaded_models")
+    base_dir = get_storage_locations()["models_dir"]
     if not os.path.isdir(base_dir):
         return []
 
@@ -799,6 +864,32 @@ def list_incomplete_hf_models_local() -> list[str]:
         if not is_hf_model_ready_local(repo_id):
             incomplete.append(repo_id)
     return sorted(incomplete)
+
+
+def delete_local_model(model_name: str) -> str:
+    normalized = _normalize_ollama_model_name(model_name)
+
+    if _is_ollama_model(model_name):
+        result = subprocess.run(
+            ["ollama", "rm", normalized],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=180,
+        )
+        if result.returncode != 0:
+            details = (result.stderr or result.stdout or "Error desconocido").strip()
+            raise BackendError(f"No se pudo eliminar modelo Ollama '{normalized}': {details}")
+        return f"Modelo Ollama eliminado: {normalized}"
+
+    safe_name = _safe_repo_path_component(model_name)
+    model_dir = os.path.join(get_storage_locations()["models_dir"], safe_name)
+    if not os.path.isdir(model_dir):
+        raise BackendError(f"No existe descarga local para '{model_name}'.")
+
+    shutil.rmtree(model_dir, ignore_errors=False)
+    return f"Modelo local eliminado: {model_name}"
 
 
 def _is_ollama_model(model_name: str) -> bool:

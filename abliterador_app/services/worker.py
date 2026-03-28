@@ -1,13 +1,18 @@
+import threading
+
 from PySide6.QtCore import QObject, Signal, Slot
 
 from abliterador_app.domain.models import WorkerTask
 from abliterador_app.services.backends import (
     BackendError,
     create_backend,
+    delete_local_model,
     download_model,
+    get_storage_locations,
     is_hf_model_ready_local,
     list_incomplete_hf_models_local,
     search_downloadable_models,
+    set_storage_base_dir,
     BACKEND_MODE_AUTO,
     BACKEND_MODE_HERETIC,
 )
@@ -53,6 +58,13 @@ class ModelTaskWorker(QObject):
         self.backend = None
         self.loaded_model_name = ""
         self.logger = get_logger()
+        self.download_cancel_event = threading.Event()
+
+    def cancel_download(self):
+        self.download_cancel_event.set()
+
+    def _is_download_cancelled(self) -> bool:
+        return self.download_cancel_event.is_set()
 
     @Slot(object)
     def run_task(self, task: WorkerTask):
@@ -115,11 +127,13 @@ class ModelTaskWorker(QObject):
                 if not model_name:
                     raise BackendError("Selecciona un modelo para descargar.")
 
+                self.download_cancel_event.clear()
                 self.progress.emit(f"Preparando descarga: {model_name}...")
                 try:
                     message = download_model(
                         model_name,
                         progress_callback=self.progress.emit,
+                        cancel_check=self._is_download_cancelled,
                     )
                 except Exception as exc:
                     if _looks_like_hf_repairable_error(str(exc)):
@@ -130,6 +144,7 @@ class ModelTaskWorker(QObject):
                             message = download_model(
                                 model_name,
                                 progress_callback=self.progress.emit,
+                                cancel_check=self._is_download_cancelled,
                             )
                         else:
                             raise BackendError(repair.get("message", "No se pudo reparar Hugging Face automáticamente."))
@@ -156,6 +171,53 @@ class ModelTaskWorker(QObject):
                         "operation": task.operation,
                         "target": target,
                         "output": result.get("message", "Auto-reparación completada."),
+                        "log_path": get_log_path(),
+                    }
+                )
+                return
+
+            if task.operation == "delete_model_local":
+                model_name = task.model_name.strip()
+                if not model_name:
+                    raise BackendError("Selecciona un modelo para eliminar.")
+                message = delete_local_model(model_name)
+                self.success.emit(
+                    {
+                        "operation": task.operation,
+                        "model_name": model_name,
+                        "output": message,
+                        "log_path": get_log_path(),
+                    }
+                )
+                return
+
+            if task.operation == "set_storage_base_dir":
+                base_dir = task.model_name.strip()
+                if not base_dir:
+                    raise BackendError("Selecciona una carpeta válida para almacenamiento.")
+                locations = set_storage_base_dir(base_dir)
+                self.success.emit(
+                    {
+                        "operation": task.operation,
+                        "output": (
+                            "Ubicación de descargas actualizada. "
+                            f"Modelos: {locations['models_dir']} | Cache HF: {locations['hf_cache_dir']}"
+                        ),
+                        "locations": locations,
+                        "log_path": get_log_path(),
+                    }
+                )
+                return
+
+            if task.operation == "get_storage_locations":
+                locations = get_storage_locations()
+                self.success.emit(
+                    {
+                        "operation": task.operation,
+                        "locations": locations,
+                        "output": (
+                            f"Modelos: {locations['models_dir']} | Cache HF: {locations['hf_cache_dir']}"
+                        ),
                         "log_path": get_log_path(),
                     }
                 )
@@ -196,14 +258,23 @@ class ModelTaskWorker(QObject):
                         "Modelo HF no está completo localmente. Descargando antes de cargar para evitar bloqueos..."
                     )
                     try:
-                        download_model(normalized, progress_callback=self.progress.emit)
+                        self.download_cancel_event.clear()
+                        download_model(
+                            normalized,
+                            progress_callback=self.progress.emit,
+                            cancel_check=self._is_download_cancelled,
+                        )
                     except Exception as exc:
                         if _looks_like_hf_repairable_error(str(exc)):
                             self.progress.emit("Micro IA: intento de recuperación de descarga HF previo a la carga...")
                             repair = attempt_auto_repair("huggingface", progress_callback=self.progress.emit)
                             if not repair.get("ok", False):
                                 raise BackendError(repair.get("message", "No se pudo reparar la caché HF."))
-                            download_model(normalized, progress_callback=self.progress.emit)
+                            download_model(
+                                normalized,
+                                progress_callback=self.progress.emit,
+                                cancel_check=self._is_download_cancelled,
+                            )
                         else:
                             raise
 
