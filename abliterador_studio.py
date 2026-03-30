@@ -8,7 +8,7 @@ from PySide6.QtWidgets import QApplication
 from abliterador_app.services.logger import setup_app_logging
 from abliterador_app.ui.main_window import ModelSearcher
 
-APP_VERSION = "0.4.0"
+APP_VERSION = "0.5.0"
 
 
 def main():

@@ -9,6 +9,8 @@ from abliterador_web.app import app
 from abliterador_web.config import load_settings
 from abliterador_web.network import detect_server_addresses
 
+APP_VERSION = "0.5.0"
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Abliterador all-in-one server launcher")
@@ -22,7 +24,7 @@ def main() -> None:
     settings = load_settings()
     urls = [item.url for item in detect_server_addresses(settings.port)]
 
-    print("\nAbliterador All-in-One levantando servicios...")
+    print(f"\nAbliterador All-in-One v{APP_VERSION} levantando servicios...")
     print("Acceso disponible en:")
     for url in urls:
         print(f"  - {url}")

@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.5.0] - 2026-03-29 🚀 LAN All-in-One Release
+### Added
+- All-in-one server launcher executable path and startup flow documented for Windows Server.
+- Visible version in all-in-one startup banner.
+- Windows Server service setup script with NSSM/task fallback.
+- Runtime guard tests for local-network detection, rate limiting and model cache reuse.
+
+### Changed
+- Web server hardening: model list cache TTL, IP-based rate limiting and resilient Ollama HTTP session.
+- Expanded curated abliterated model catalog with additional lightweight, coding and high-capacity options.
+- Project version bumped to 0.5.0.
+
+### Fixed
+- PyInstaller all-in-one packaging now includes web static/template assets and uses active interpreter.
+- Cleaned redundant generated artifacts from workspace before release.
+
+---
+
 ## [0.4.0] - 2026-03-28 🚀 Distribution Release
 ### Added
 - **Setup Infrastructure:** `setup.py` for pip installation support (all platforms).

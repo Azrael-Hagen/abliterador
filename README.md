@@ -1,6 +1,6 @@
 # Abliterador Studio
 
-**Versión:** `v0.4.0` — *2026-03-28* 🚀
+**Versión actual:** `v0.5.0` — *2026-03-29* 🚀
 
 Aplicacion GUI en PySide6 para buscar modelos, cargarlos localmente, aplicar abliteración y probar generacion de texto.
 
@@ -27,6 +27,7 @@ python abliterador_studio.py
 
 | Versión | Fecha | Cambios principales |
 |---------|-------|---------------------|
+| `0.5.0` | 2026-03-29 | **Servidor LAN all-in-one:** hardening web, perfil multiusuario aislado, IP visible, servicio Windows Server, catálogo ampliado |
 | `0.4.0` | 2026-03-28 | **Distribución profesional:** setup.py, pyproject.toml, PyInstaller, ejecutables precompilados, INSTALLATION.md 🎁 |
 | `0.3.1` | 2026-03-28 | Descarga HF resiliente con reintentos/backoff, auto-recuperación en worker, chip Micro IA durante arranque |
 | `0.3.0` | 2026-03-26 | Paquete modular (domain/services/ui), integración real Heretic, factory de backends, GUI profesional |
@@ -134,10 +135,22 @@ Iniciar servidor:
 python abliterador_web_server.py
 ```
 
-Iniciar launcher all-in-one (muestra IPs LAN en consola):
+Iniciar launcher all-in-one (muestra IPs LAN en consola y versión):
 
 ```bash
 python abliterador_all_in_one.py
+```
+
+Ruta exacta del ejecutable en este entorno Windows Server:
+
+```powershell
+C:\Users\Azrael\OneDrive\Documentos\Herramientas\abliterador\dist\AbliteradorAllInOne.exe
+```
+
+Ejecutar desde cualquier consola:
+
+```powershell
+& "C:\Users\Azrael\OneDrive\Documentos\Herramientas\abliterador\dist\AbliteradorAllInOne.exe"
 ```
 
 En Windows Server puedes instalar arranque automatico como servicio/tarea:
