@@ -2,6 +2,31 @@
 
 ## [Unreleased]
 
+## [0.10.5] - 2026-03-30 🧙 Wizard de Configuración Inicial
+### Added
+- Nuevo módulo `abliterador_web/setup_wizard.py` – wizard de configuración inteligente en dos fases:
+  - **Fase 1 (automática/silenciosa)**: detecta y corrige sin intervención del usuario:
+    - Genera JWT signing secret si está en valor por defecto
+    - Genera contraseña FTP aleatoria si está en valor por defecto
+    - Inicia Ollama automáticamente si no responde (`ollama serve`)
+    - Crea directorios de workspace si no existen
+    - Ajusta host a `0.0.0.0` si estaba limitado a localhost
+  - **Fase 2 (wizard interactivo en consola)**: guía al usuario en lo que no puede automátizarse:
+    - Cambio de contraseña admin si sigue siendo `change_me_now`
+    - Cambio de puerto HTTP si está ocupado (sugiere alternativas libres)
+    - Cambio/desactivación de FTP si el puerto está en conflicto
+    - Cambio de URL Ollama si sigue sin responder
+- Persistencia en `.abliterador.env` junto al ejecutable (idempotente, nunca rompe)
+- Inyección automática en `os.environ` antes de `load_settings()` 
+- Flag `--wizard` para forzar wizard interactivo aunque todo esté OK
+- Flag `--skip-wizard` para headless/CI (solo auto-fix, sin prompts)
+- Lanzador `launch_abliterador_allinone.bat` mejorado: detecta primera ejecución y pasa `--wizard` automáticamente
+
+### Changed
+- `abliterador_all_in_one.py`: el wizard corre antes de `load_settings()` para que las variables queden inyectadas
+- `launch_abliterador_allinone.bat`: detecta si existe `.abliterador.env` para determinar si es primera ejecución
+- VERSIONING: 0.10.4 → 0.10.5
+
 ## [0.10.4] - 2026-03-30 🛡 Configurador Inteligente LAN Windows
 ### Added
 - Nuevo módulo `windows_lan_setup.py`: al arrancar el executable verifica y configura automáticamente:

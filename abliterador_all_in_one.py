@@ -13,9 +13,10 @@ from abliterador_web.app import app
 from abliterador_web.config import load_settings
 from abliterador_web.ftp_server import ftp_urls, start_ftp_server, stop_ftp_server
 from abliterador_web.network import detect_server_addresses
+from abliterador_web.setup_wizard import run_wizard_pipeline
 from abliterador_web.windows_lan_setup import configure_lan_access, is_admin, is_windows
 
-APP_VERSION = "0.10.4"
+APP_VERSION = "0.10.5"
 
 
 def main() -> None:
@@ -35,14 +36,32 @@ def main() -> None:
         action="store_true",
         help="Relanza con UAC si se necesitan privilegios de admin para la configuracion LAN.",
     )
+    parser.add_argument(
+        "--wizard",
+        action="store_true",
+        help="Fuerza el wizard interactivo de configuracion aunque todo este correcto.",
+    )
+    parser.add_argument(
+        "--skip-wizard",
+        action="store_true",
+        help="Omite el wizard interactivo; aplica solo auto-fixes silenciosos.",
+    )
     args = parser.parse_args()
 
+    print(f"\nAbliterador All-in-One v{APP_VERSION} levantando servicios...")
+    print("")
+
+    # ── Wizard de configuración inicial ────────────────────────────────
+    # Carga .abliterador.env, auto-corrige lo que puede, wizard para el resto
+    run_wizard_pipeline(
+        force_wizard=args.wizard,
+        skip_wizard=args.skip_wizard,
+    )
+    # Ahora load_settings() ve las variables ya inyectadas en os.environ
     settings = load_settings()
     urls = [item.url for item in detect_server_addresses(settings.port)]
     ftp_runtime = None
     stop_event = threading.Event()
-
-    print(f"\nAbliterador All-in-One v{APP_VERSION} levantando servicios...")
 
     # ── Configurador inteligente de acceso LAN ──────────────────────────
     ftp_port_for_setup = settings.ftp_port if settings.ftp_enabled else None
