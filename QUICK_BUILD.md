@@ -1,4 +1,4 @@
-# 🏗️ INSTRUCCIONES PARA COMPILAR EJECUTABLES - v0.6.0
+# 🏗️ INSTRUCCIONES PARA COMPILAR EJECUTABLES - v0.7.0
 
 Sigue estos pasos **en cada sistema operativo** para criar los ejecutables precompilados que pueden ser distribuidos.
 
@@ -59,7 +59,7 @@ cd AbliteradorStudio
 
 # O prueba servidor all-in-one:
 .\AbliteradorAllInOne.exe
-# → Debe mostrar versión + IPs LAN + FTP LAN y dejar acceso por navegador/cliente FTP
+# → Debe mostrar versión + IPs LAN + FTP LAN y habilitar Admin Studio Web
 
 # Ruta exacta del ejecutable en este proyecto
 # C:\Users\Azrael\OneDrive\Documentos\Herramientas\abliterador\dist\AbliteradorAllInOne.exe

@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.7.0] - 2026-03-30 🚀 Admin Studio Web Release
+### Added
+- Registro de nuevos usuarios desde la UI web (`/api/signup`).
+- Catálogo de roles y permisos usuales (`admin`, `manager`, `operator`, `viewer`).
+- Gestión administrativa completa de usuarios: crear, cambiar rol, activar/desactivar y eliminar.
+- Descarga de modelos solicitada por administradores con jobs y seguimiento de estado.
+- Panel Admin Studio Web con acciones de auto-recuperación y lanzamiento de GUI de escritorio.
+
+### Changed
+- Versionado del proyecto incrementado a 0.7.0.
+- Endpoints de perfil/usuarios ahora exponen estado activo y permisos.
+- All-in-one incorpora watchdog automático para recuperación de Ollama y reinicio FTP.
+
+### Fixed
+- Compatibilidad de rutas FTP en Windows para escritura/lectura mediante normalización virtual segura.
+
+---
+
 ## [0.6.0] - 2026-03-30 🚀 LAN FTP Release
 ### Added
 - FTP LAN integrado al launcher all-in-one para subir/descargar archivos desde red local.

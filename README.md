@@ -1,6 +1,6 @@
 # Abliterador Studio
 
-**Versión actual:** `v0.6.0` — *2026-03-30* 🚀
+**Versión actual:** `v0.7.0` — *2026-03-30* 🚀
 
 Aplicacion GUI en PySide6 para buscar modelos, cargarlos localmente, aplicar abliteración y probar generacion de texto.
 
@@ -27,6 +27,7 @@ python abliterador_studio.py
 
 | Versión | Fecha | Cambios principales |
 |---------|-------|---------------------|
+| `0.7.0` | 2026-03-30 | **Admin Studio Web:** registro de usuarios, catálogo de roles/permisos, descargas de modelos, auto-recuperación y lanzamiento de GUI de escritorio |
 | `0.6.0` | 2026-03-30 | **FTP LAN estilo nube local:** subida/descarga en bibliotecas de Windows, integrado al all-in-one con visibilidad de estado |
 | `0.5.0` | 2026-03-29 | **Servidor LAN all-in-one:** hardening web, perfil multiusuario aislado, IP visible, servicio Windows Server, catálogo ampliado |
 | `0.4.0` | 2026-03-28 | **Distribución profesional:** setup.py, pyproject.toml, PyInstaller, ejecutables precompilados, INSTALLATION.md 🎁 |
@@ -186,6 +187,22 @@ http://<ip-del-servidor>:8088
 
 La UI también muestra las URLs LAN detectadas en la sección "Acceso LAN".
 También muestra el estado de FTP LAN, rutas de bibliotecas y endpoints FTP disponibles.
+
+Admin Studio Web (solo administradores):
+- Gestión de usuarios: crear, cambiar rol, activar/desactivar y eliminar.
+- Catálogo de roles usuales y permisos: `admin`, `manager`, `operator`, `viewer`.
+- Solicitud de descarga de modelos en servidor (`ollama pull`) con estado por job.
+- Diagnóstico y ejecución de auto-recuperación del servidor.
+- Lanzamiento de la GUI de escritorio (`AbliteradorStudio`) desde el panel web admin.
+
+Registro de nuevos usuarios:
+- Disponible directamente en la UI web (bloque "Registro").
+- Rol inicial por defecto para nuevos registros: `viewer`.
+
+Credenciales iniciales por defecto:
+- Usuario admin: `admin`
+- Password admin: `change_me_now`
+- Cambiar inmediatamente en variables de entorno para producción LAN.
 
 Notas de seguridad para produccion:
 - Usa password fuerte y secret unico.

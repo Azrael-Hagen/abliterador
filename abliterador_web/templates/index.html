@@ -18,7 +18,15 @@
         <input id="username" placeholder="Usuario" value="admin" />
         <input id="password" type="password" placeholder="Password" />
         <button id="btnLogin">Conectar</button>
+        <p class="muted small">Credenciales iniciales: {{ default_admin_user }} / {{ default_admin_password }}</p>
         <p id="profileInfo" class="muted small"></p>
+      </section>
+
+      <section class="block">
+        <h2>Registro</h2>
+        <input id="signupUser" placeholder="Nuevo usuario" />
+        <input id="signupPass" type="password" placeholder="Password (8+ caracteres)" />
+        <button id="btnSignup">Suscribirse</button>
       </section>
 
       <section id="adminBlock" class="block" style="display:none;">
@@ -26,10 +34,33 @@
         <input id="newUser" placeholder="Nuevo usuario" />
         <input id="newPass" type="password" placeholder="Password inicial" />
         <select id="newRole">
-          <option value="user">user</option>
+          <option value="viewer">viewer</option>
+          <option value="operator">operator</option>
+          <option value="manager">manager</option>
           <option value="admin">admin</option>
         </select>
         <button id="btnCreateUser">Crear perfil</button>
+
+        <button id="btnRefreshUsers">Actualizar catalogo usuarios</button>
+        <select id="userCatalog"></select>
+        <select id="editRole">
+          <option value="viewer">viewer</option>
+          <option value="operator">operator</option>
+          <option value="manager">manager</option>
+          <option value="admin">admin</option>
+        </select>
+        <label class="toggle"><input id="editActive" type="checkbox" checked /> Usuario activo</label>
+        <button id="btnApplyUserEdit">Aplicar cambios usuario</button>
+        <button id="btnDeleteUser" class="danger">Eliminar usuario</button>
+
+        <h2>Admin Studio</h2>
+        <input id="pullModelName" placeholder="Modelo para descargar (ej: qwen2.5:7b)" />
+        <button id="btnPullModel">Solicitar descarga modelo</button>
+        <p id="pullStatus" class="muted small"></p>
+
+        <button id="btnSelfHealCheck">Diagnostico auto-recuperacion</button>
+        <button id="btnSelfHealRun">Ejecutar auto-recuperacion</button>
+        <button id="btnLaunchGui">Abrir GUI de escritorio en servidor</button>
       </section>
 
       <section class="block">
