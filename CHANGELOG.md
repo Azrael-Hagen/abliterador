@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [0.10.3] - 2026-03-30 ✨ UI Polish & File Tools in Streaming
+### Added
+- Markdown rendering en respuestas IA: code blocks, inline code, bold, listas, links.
+- Cursor de streaming animado (`▍`) durante generacion de tokens.
+- Botón "Copiar" en mensajes IA al completarse la respuesta.
+- Timestamps en cada burbuja de mensaje.
+- Tinte de calidad en burbuja IA: verde/amarillo/rojo según score QA.
+- Soporte completo de file tools en streaming (`/api/chat/stream`): ya no devuelve 400 si `use_file_tools=true`.
+- Estilado mejorado de scrollbars, inputs con focus ring, empty state centrado.
+
+### Fixed
+- Error 400 `Streaming no disponible con file tools` eliminado: el endpoint de streaming ahora ejecuta herramientas de archivo de forma síncrona dentro del generador y hace streaming del follow-up.
+
 ## [0.10.2] - 2026-03-30 ⚡ Streaming & Performance Hardening
 ### Added
 - Nuevo endpoint `POST /api/chat/stream` con salida NDJSON token a token para feedback inmediato en UI.

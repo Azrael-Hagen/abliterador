@@ -281,7 +281,7 @@ def create_app() -> FastAPI:
     server_urls = [item.url for item in detect_server_addresses(settings.port)]
     ftp_access_urls = ftp_urls(settings.ftp_port) if settings.ftp_enabled else []
 
-    app = FastAPI(title="Abliterador Web Server", version="0.10.2")
+    app = FastAPI(title="Abliterador Web Server", version="0.10.3")
     module_dir = Path(__file__).resolve().parent
     repo_root = module_dir.parent
     assets_dir = repo_root / "sources"
@@ -706,9 +706,7 @@ def create_app() -> FastAPI:
 
     @app.post("/api/chat/stream")
     async def chat_stream(payload: ChatRequest, user: AuthUser = Depends(require_permission("chat"))):
-        if payload.use_file_tools:
-            raise HTTPException(status_code=400, detail="Streaming no disponible con file tools; usa /api/chat/quality")
-
+        sandbox = user_sandbox(user) if payload.use_file_tools else None
         messages, tool_events = await _prepare_chat_messages(payload)
         started = time.perf_counter()
 
@@ -725,6 +723,30 @@ def create_app() -> FastAPI:
                         yield json.dumps({"type": "token", "delta": delta}, ensure_ascii=False) + "\n"
 
                 reply = "".join(chunks).strip()
+
+                # File tool execution inside the stream (synchronous, runs in StreamingResponse thread)
+                if payload.use_file_tools and sandbox is not None:
+                    tool_call = _extract_tool_call(reply)
+                    if tool_call:
+                        try:
+                            tool_result = _run_file_tool(sandbox, tool_call)
+                            yield json.dumps({"type": "tool", "message": tool_result}, ensure_ascii=False) + "\n"
+                            follow_msgs = list(messages) + [
+                                {"role": "assistant", "content": reply},
+                                {"role": "tool", "content": tool_result},
+                            ]
+                            follow_chunks: list[str] = []
+                            for row2 in ollama.chat_stream(payload.model, follow_msgs, payload.chat_timeout_s):
+                                delta2 = str(row2.get("delta", ""))
+                                if delta2:
+                                    follow_chunks.append(delta2)
+                                    yield json.dumps({"type": "token", "delta": delta2}, ensure_ascii=False) + "\n"
+                            reply = "".join(follow_chunks).strip()
+                        except SandboxError as exc:
+                            yield json.dumps({"type": "tool", "message": f"tool rechazada por sandbox: {exc}"}, ensure_ascii=False) + "\n"
+                        except Exception as exc:
+                            yield json.dumps({"type": "tool", "message": f"tool error: {exc}"}, ensure_ascii=False) + "\n"
+
                 if payload.quality_check_enabled:
                     quality = chat_quality_checker.check_response(reply, payload.message)
                     summary = chat_quality_checker.get_quality_summary(quality)

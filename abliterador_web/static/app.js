@@ -11,6 +11,9 @@ import {
   setActiveModel,
   updateModelBadges,
   appendTransferLog,
+  addCursor,
+  removeCursor,
+  finalizeMsg,
 } from "./app_core.js";
 import {
   renderFileRows,
@@ -117,15 +120,20 @@ async function streamChatResponse(payload) {
     throw new Error(await parseErrorResponse(response));
   }
 
-  const aiMsg = createMsg("ai", "", `Modelo usado: ${payload.model}`);
+  const aiMsg = createMsg("ai", "", `Modelo: ${payload.model}`);
+  const aiWrap = aiMsg?.parentElement || null;
+
   if (!(response.body && aiMsg instanceof HTMLElement)) {
     const fallbackEndpoint = payload.quality_check_enabled ? "/api/chat/quality" : "/api/chat";
     const data = await apiRequest(fallbackEndpoint, "POST", payload, false, {
       signal: state.chatAbortController?.signal,
     });
-    aiMsg.textContent = data.reply || "(sin respuesta)";
+    finalizeMsg(aiWrap, data.reply || "(sin respuesta)", null);
     return data;
   }
+
+  // Add blinking cursor while streaming
+  addCursor(aiMsg);
 
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
@@ -151,7 +159,11 @@ async function streamChatResponse(payload) {
 
       if (event.type === "token") {
         reply += event.delta || "";
+        // Update raw text during streaming (cursor stays at end)
+        removeCursor(aiMsg);
         aiMsg.textContent = reply || " ";
+        addCursor(aiMsg);
+        if (el.log) el.log.scrollTop = el.log.scrollHeight;
       } else if (event.type === "tool") {
         const text = String(event.message || "").trim();
         if (text) {
@@ -165,14 +177,14 @@ async function streamChatResponse(payload) {
         modelUsed = event.model_used || modelUsed;
         elapsedMs = Number(event.elapsed_ms || 0);
       } else if (event.type === "error") {
+        removeCursor(aiMsg);
         throw new Error(String(event.message || "Error de streaming"));
       }
     }
   }
 
-  if (!reply.trim()) {
-    aiMsg.textContent = "(sin respuesta)";
-  }
+  // Finalize: render markdown + quality border + copy button
+  finalizeMsg(aiWrap, reply.trim() || "(sin respuesta)", qualityScore);
 
   if (qualitySummary) {
     addMsg("tool", `Calidad: ${qualitySummary}`);
@@ -241,6 +253,7 @@ async function sendChat() {
     }
 
     setProgress(true, "Generando respuesta en streaming...");
+    if (el.statusStrip) el.statusStrip.classList.add("generating");
     const data = await streamChatResponse(payload);
     setProgress(true, "Finalizando respuesta...");
 
@@ -267,6 +280,7 @@ async function sendChat() {
     window.clearTimeout(timeoutHandle);
     state.isGenerating = false;
     state.chatAbortController = null;
+    if (el.statusStrip) el.statusStrip.classList.remove("generating");
     if (el.btnSend) el.btnSend.disabled = false;
     if (el.btnCancel) el.btnCancel.disabled = true;
     setProgress(false, "Listo");

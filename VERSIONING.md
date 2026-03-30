@@ -6,7 +6,7 @@
 - **MINOR:** New user-visible features that preserve existing flows (e.g., new backend option, new export format).
 - **PATCH:** Bug fixes, security patches, and non-breaking improvements (e.g., faster load, UI polish).
 
-**Current Version:** `0.10.2` (streaming NDJSON en chat, timeout robusto y pipeline backend unificado sin bloqueos)
+**Current Version:** `0.10.3` (markdown en respuestas IA, streaming con file tools, polish de UI)
 
 ## Distribution & Releases
 

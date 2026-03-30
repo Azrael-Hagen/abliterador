@@ -430,6 +430,237 @@ textarea {
   }
 }
 
+/* ── Markdown inside AI messages ─────────────────────────────── */
+.msg.ai pre {
+  background: rgba(0, 0, 0, 0.48);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  overflow-x: auto;
+  font-size: 13px;
+  font-family: "Cascadia Code", "Fira Mono", "Consolas", monospace;
+  line-height: 1.55;
+  margin: 6px 0;
+}
+
+.msg.ai code {
+  background: rgba(0, 0, 0, 0.38);
+  border-radius: 5px;
+  padding: 1px 5px;
+  font-size: 0.88em;
+  font-family: "Cascadia Code", "Fira Mono", "Consolas", monospace;
+  color: #9ef5e0;
+}
+
+.msg.ai pre code {
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  color: #c9f2e7;
+}
+
+.msg.ai strong { color: var(--accent); }
+.msg.ai em { color: var(--accent2); }
+
+.msg.ai ul,
+.msg.ai ol {
+  padding-left: 20px;
+  margin: 4px 0;
+}
+
+.msg.ai li { margin: 2px 0; }
+
+.msg.ai p { margin: 4px 0; }
+
+.msg.ai a {
+  color: var(--accent2);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* ── Message wrapper and header ──────────────────────────────── */
+.msg-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.msg-wrap.user-wrap { align-items: flex-end; }
+.msg-wrap.ai-wrap { align-items: flex-start; }
+.msg-wrap.tool-wrap { align-items: flex-start; }
+
+.msg-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 4px;
+  margin-bottom: 3px;
+  font-size: 11px;
+  color: var(--muted);
+  opacity: 0.7;
+}
+
+.msg-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 4px 0;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+
+.msg-wrap:hover .msg-actions { opacity: 1; }
+
+.btn-copy {
+  width: auto;
+  margin: 0;
+  padding: 3px 7px;
+  font-size: 11px;
+  background: rgba(89, 215, 184, 0.12);
+  border: 1px solid rgba(89, 215, 184, 0.35);
+  border-radius: 6px;
+  cursor: pointer;
+  color: #9ef5e0;
+  transition: background 0.15s;
+  line-height: 1;
+}
+
+.btn-copy:hover {
+  background: rgba(89, 215, 184, 0.25);
+  transform: none;
+  box-shadow: none;
+}
+
+/* ── Streaming cursor ────────────────────────────────────────── */
+.cursor-blink {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  background: var(--accent);
+  vertical-align: text-bottom;
+  border-radius: 1px;
+  animation: cursorBlink 0.75s step-end infinite;
+  margin-left: 1px;
+}
+
+@keyframes cursorBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* ── AI message quality tint ─────────────────────────────────── */
+.msg.ai.quality-high {
+  border-color: rgba(89, 215, 184, 0.38);
+  box-shadow: 0 0 0 1px rgba(89, 215, 184, 0.12) inset;
+}
+
+.msg.ai.quality-mid {
+  border-color: rgba(255, 201, 129, 0.38);
+  box-shadow: 0 0 0 1px rgba(255, 201, 129, 0.12) inset;
+}
+
+.msg.ai.quality-low {
+  border-color: rgba(255, 143, 143, 0.38);
+  box-shadow: 0 0 0 1px rgba(255, 143, 143, 0.12) inset;
+}
+
+/* ── Improved message bubbles ────────────────────────────────── */
+.msg {
+  font-size: 14px;
+  line-height: 1.6;
+  word-break: break-word;
+}
+
+.msg.user {
+  box-shadow: 0 2px 10px rgba(84, 176, 230, 0.12);
+}
+
+.msg.ai {
+  box-shadow: 0 2px 10px rgba(89, 215, 184, 0.08);
+}
+
+.msg.tool {
+  font-size: 12px;
+  padding: 7px 10px;
+  opacity: 0.86;
+}
+
+/* ── Chat toolbar improvement ────────────────────────────────── */
+.chat-toolbar {
+  background: rgba(8, 16, 24, 0.6);
+}
+
+/* ── Improved composer ───────────────────────────────────────── */
+.composer {
+  border-top: 1px solid var(--line);
+}
+
+textarea {
+  font-size: 14px;
+  line-height: 1.55;
+  transition: border-color 0.18s;
+}
+
+textarea:focus {
+  outline: none;
+  border-color: rgba(89, 215, 184, 0.5);
+  box-shadow: 0 0 0 2px rgba(89, 215, 184, 0.08);
+}
+
+/* ── Sidebar section polish ──────────────────────────────────── */
+.block {
+  border-top-style: solid;
+  border-top-color: rgba(110, 177, 209, 0.14);
+}
+
+.block h2 {
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+input:focus,
+select:focus {
+  outline: none;
+  border-color: rgba(84, 176, 230, 0.55);
+  box-shadow: 0 0 0 2px rgba(84, 176, 230, 0.08);
+}
+
+/* ── Better chat empty state ─────────────────────────────────── */
+.chat-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 180px;
+  text-align: center;
+}
+
+.chat-empty strong {
+  font-size: 18px;
+  color: var(--accent);
+  display: block;
+  margin-bottom: 8px;
+}
+
+.chat-empty span {
+  font-size: 13px;
+  color: var(--muted);
+  max-width: 360px;
+}
+
+/* ── Status strip typing animation ───────────────────────────── */
+.status-strip.generating {
+  color: var(--accent);
+}
+
+/* ── Scrollbar styling ───────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(110, 177, 209, 0.3); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(110, 177, 209, 0.5); }
+
 @media (max-width: 1100px) {
   .layout {
     grid-template-columns: 1fr;
