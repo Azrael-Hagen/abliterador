@@ -1,6 +1,6 @@
 # Abliterador Studio
 
-**Versión actual:** `v0.5.0` — *2026-03-29* 🚀
+**Versión actual:** `v0.6.0` — *2026-03-30* 🚀
 
 Aplicacion GUI en PySide6 para buscar modelos, cargarlos localmente, aplicar abliteración y probar generacion de texto.
 
@@ -27,6 +27,7 @@ python abliterador_studio.py
 
 | Versión | Fecha | Cambios principales |
 |---------|-------|---------------------|
+| `0.6.0` | 2026-03-30 | **FTP LAN estilo nube local:** subida/descarga en bibliotecas de Windows, integrado al all-in-one con visibilidad de estado |
 | `0.5.0` | 2026-03-29 | **Servidor LAN all-in-one:** hardening web, perfil multiusuario aislado, IP visible, servicio Windows Server, catálogo ampliado |
 | `0.4.0` | 2026-03-28 | **Distribución profesional:** setup.py, pyproject.toml, PyInstaller, ejecutables precompilados, INSTALLATION.md 🎁 |
 | `0.3.1` | 2026-03-28 | Descarga HF resiliente con reintentos/backoff, auto-recuperación en worker, chip Micro IA durante arranque |
@@ -118,6 +119,14 @@ set ABLITERADOR_WEB_PORT=8088
 set ABLITERADOR_MODELS_CACHE_TTL_S=20
 set ABLITERADOR_RATE_LIMIT_PER_MINUTE=120
 
+# FTP LAN (solo red local)
+set ABLITERADOR_FTP_ENABLED=1
+set ABLITERADOR_FTP_HOST=0.0.0.0
+set ABLITERADOR_FTP_PORT=2121
+set ABLITERADOR_FTP_USER=lanuser
+set ABLITERADOR_FTP_PASSWORD=tu_password_ftp
+set ABLITERADOR_FTP_ROOT=C:\Users\Azrael
+
 # Ollama remoto/local (OpenAI-compatible endpoint de Ollama)
 set ABLITERADOR_OLLAMA_URL=http://127.0.0.1:11434
 
@@ -160,7 +169,7 @@ En Windows Server puedes instalar arranque automatico como servicio/tarea:
 python build_installer.py --onefile --all-in-one
 
 # Ejecutar como Administrador (instala servicio NSSM o tarea ONSTART)
-powershell -ExecutionPolicy Bypass -File .\setup_windows_server_service.ps1 -Action install -Port 8088
+powershell -ExecutionPolicy Bypass -File .\setup_windows_server_service.ps1 -Action install -Port 8088 -FtpPort 2121
 ```
 
 Eliminar servicio/tarea:
@@ -176,6 +185,7 @@ http://<ip-del-servidor>:8088
 ```
 
 La UI también muestra las URLs LAN detectadas en la sección "Acceso LAN".
+También muestra el estado de FTP LAN, rutas de bibliotecas y endpoints FTP disponibles.
 
 Notas de seguridad para produccion:
 - Usa password fuerte y secret unico.

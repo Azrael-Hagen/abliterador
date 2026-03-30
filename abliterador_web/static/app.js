@@ -16,6 +16,7 @@ const newPass = document.getElementById("newPass");
 const newRole = document.getElementById("newRole");
 const btnCreateUser = document.getElementById("btnCreateUser");
 const serverUrls = document.getElementById("serverUrls");
+const ftpUrls = document.getElementById("ftpUrls");
 
 function addMsg(role, text) {
   const div = document.createElement("div");
@@ -92,6 +93,15 @@ async function loadServerInfo() {
     const li = document.createElement("li");
     li.textContent = url;
     serverUrls.appendChild(li);
+  }
+
+  if (ftpUrls && data.ftp && Array.isArray(data.ftp.urls)) {
+    ftpUrls.innerHTML = "";
+    for (const url of data.ftp.urls) {
+      const li = document.createElement("li");
+      li.textContent = url;
+      ftpUrls.appendChild(li);
+    }
   }
 }
 

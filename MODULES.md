@@ -70,6 +70,10 @@
 - Purpose: Persistencia de perfiles LAN con hash de password y roles.
 - Public API: ensure_admin(), create_user(), list_users(), verify_credentials().
 
+18. FTP Server Integration
+- Purpose: Exponer transferencia de archivos LAN (upload/download/delete) en all-in-one.
+- Public API: start_ftp_server(), stop_ftp_server(), ftp_urls(), discover_windows_libraries().
+
 ## Reuse Rules
 - Any new long-running operation must be routed through ModelTaskWorker.
 - Any new generation controls must be added to GenerationSettings first.

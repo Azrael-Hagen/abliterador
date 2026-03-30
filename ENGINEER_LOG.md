@@ -1,5 +1,25 @@
 # Engineer Log
 
+## [CP-07] 2026-03-30
+Status: Passed
+Decisions made:
+- Integrated FTP LAN service into `abliterador_all_in_one.py` so web + FTP start together in one executable.
+- Added `ABLITERADOR_FTP_*` settings for host, port, credentials, root path and enable/disable switch.
+- Exposed FTP status/URLs in `/api/health`, `/api/server-info` and sidebar UI.
+- Implemented custom FTP filesystem normalization for Windows path semantics to avoid write failures.
+
+Trade-offs:
+- Chose pyftpdlib for lightweight embedded FTP over full SMB/WebDAV stack to keep onefile distribution simple.
+- FTP credentials are env-driven for operational simplicity; advanced RBAC/audit trail deferred.
+
+Debt deferred:
+- Per-user FTP chroot mapping aligned with web profile workspace.
+- Optional FTPS/TLS for encrypted LAN deployments.
+
+Next steps:
+- Add integration test that boots all-in-one and validates FTP login + file transfer in CI.
+- Add optional passive port range config for stricter firewall setups.
+
 ## [CP-06] 2026-03-29
 Status: Passed
 Decisions made:

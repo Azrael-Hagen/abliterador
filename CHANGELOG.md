@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.6.0] - 2026-03-30 🚀 LAN FTP Release
+### Added
+- FTP LAN integrado al launcher all-in-one para subir/descargar archivos desde red local.
+- Descubrimiento y exposición de bibliotecas usuales de Windows (Desktop, Documents, Downloads, Pictures, Music, Videos).
+- Estado y URLs FTP visibles en UI y endpoints de estado del servidor.
+- Configuración por entorno para FTP (`ABLITERADOR_FTP_*`).
+
+### Changed
+- Versión del proyecto incrementada a 0.6.0.
+- Banner de arranque all-in-one muestra versión y estado de FTP LAN.
+
+### Fixed
+- Validación de integración all-in-one con servicios simultáneos (web + FTP) sin romper el flujo LAN-only.
+
+---
+
 ## [0.5.0] - 2026-03-29 🚀 LAN All-in-One Release
 ### Added
 - All-in-one server launcher executable path and startup flow documented for Windows Server.

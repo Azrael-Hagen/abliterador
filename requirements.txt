@@ -27,6 +27,7 @@ pydantic==2.8.2
 fastapi==0.115.0
 uvicorn==0.30.6
 jinja2==3.1.4
+pyftpdlib==1.5.9
 
 # Build & Packaging (dev only, not needed in production)
 # PyInstaller==6.10.0 (install separately with `pip install -e .[dev]`)

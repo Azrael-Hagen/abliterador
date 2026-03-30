@@ -79,3 +79,16 @@ Acceptance Criteria:
 - [x] Bloqueo de path traversal y rutas absolutas validado con pruebas.
 Status: [x]
 Notes: Se añadió modo web en `abliterador_web/` y entrypoint `abliterador_web_server.py` sin alterar el flujo GUI existente. Se activó guard para red local y gestión de perfiles desde UI admin.
+
+---
+
+## CP-07: FTP LAN Integrado
+Milestone: Transferencia de archivos tipo nube local desde cliente FTP en red interna.
+Acceptance Criteria:
+- [x] Servidor FTP embebido arranca junto al all-in-one.
+- [x] Acceso FTP restringido a red local cuando `ABLITERADOR_LOCAL_NETWORK_ONLY=1`.
+- [x] Subida, descarga y borrado validados con prueba de roundtrip.
+- [x] Información FTP visible en consola all-in-one y endpoints de salud.
+- [x] Configuración por variables `ABLITERADOR_FTP_*` documentada.
+Status: [x]
+Notes: Se corrigió normalización de rutas virtuales FTP en Windows mediante filesystem personalizado para evitar fallos de escritura en pyftpdlib.

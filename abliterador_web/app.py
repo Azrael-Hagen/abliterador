@@ -25,6 +25,7 @@ from abliterador_web.models import (
     UserCreateRequest,
     UserProfileResponse,
 )
+from abliterador_web.ftp_server import ftp_urls
 from abliterador_web.network import detect_server_addresses, is_local_network_ip
 from abliterador_web.ollama_client import OllamaClient
 from abliterador_web.sandbox import FileSandbox, SandboxError
@@ -105,8 +106,9 @@ def create_app() -> FastAPI:
     models_cache = ModelsCache(settings.models_cache_ttl_s)
     rate_limiter = SlidingWindowRateLimiter(settings.rate_limit_per_minute, 60)
     server_urls = [item.url for item in detect_server_addresses(settings.port)]
+    ftp_access_urls = ftp_urls(settings.ftp_port) if settings.ftp_enabled else []
 
-    app = FastAPI(title="Abliterador Web Server", version="0.1.0")
+    app = FastAPI(title="Abliterador Web Server", version="0.6.0")
     module_dir = Path(__file__).resolve().parent
     templates = Jinja2Templates(directory=str(module_dir / "templates"))
     app.mount("/static", StaticFiles(directory=str(module_dir / "static")), name="static")
@@ -158,6 +160,10 @@ def create_app() -> FastAPI:
                 "app_name": "Abliterador Nexus",
                 "allowed_dirs": [str(settings.user_workspaces_root)],
                 "server_urls": server_urls,
+                "ftp_enabled": settings.ftp_enabled,
+                "ftp_urls": ftp_access_urls,
+                "ftp_root": str(settings.ftp_root),
+                "ftp_libraries": [str(path) for path in settings.ftp_libraries],
             },
         )
 
@@ -214,6 +220,15 @@ def create_app() -> FastAPI:
             "host": settings.host,
             "port": settings.port,
             "local_network_only": settings.local_network_only,
+            "ftp": {
+                "enabled": settings.ftp_enabled,
+                "host": settings.ftp_host,
+                "port": settings.ftp_port,
+                "username": settings.ftp_username,
+                "root": str(settings.ftp_root),
+                "libraries": [str(path) for path in settings.ftp_libraries],
+                "urls": ftp_access_urls,
+            },
         }
 
     @app.post("/api/chat", response_model=ChatResponse)
@@ -308,6 +323,9 @@ def create_app() -> FastAPI:
             "server_urls": server_urls,
             "models_cache_ttl_s": settings.models_cache_ttl_s,
             "rate_limit_per_minute": settings.rate_limit_per_minute,
+            "ftp_enabled": settings.ftp_enabled,
+            "ftp_urls": ftp_access_urls,
+            "ftp_root": str(settings.ftp_root),
         }
 
     return app

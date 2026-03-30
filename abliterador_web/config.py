@@ -2,6 +2,8 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from abliterador_web.ftp_server import discover_windows_libraries
+
 
 @dataclass(frozen=True)
 class WebSettings:
@@ -17,6 +19,13 @@ class WebSettings:
     local_network_only: bool
     models_cache_ttl_s: int
     rate_limit_per_minute: int
+    ftp_enabled: bool
+    ftp_host: str
+    ftp_port: int
+    ftp_username: str
+    ftp_password: str
+    ftp_root: Path
+    ftp_libraries: list[Path]
 
 
 def _parse_allowed_dirs(raw: str) -> list[Path]:
@@ -34,6 +43,7 @@ def _parse_allowed_dirs(raw: str) -> list[Path]:
 
 def load_settings() -> WebSettings:
     workspace = Path.cwd().resolve()
+    home = Path.home().resolve()
     default_sandbox = workspace / "web_workspace"
     default_sandbox.mkdir(parents=True, exist_ok=True)
     user_workspaces_root = default_sandbox / "users"
@@ -47,6 +57,10 @@ def load_settings() -> WebSettings:
 
     for path in allowed_dirs:
         path.mkdir(parents=True, exist_ok=True)
+
+    ftp_root = Path(os.getenv("ABLITERADOR_FTP_ROOT", str(home))).resolve()
+    ftp_root.mkdir(parents=True, exist_ok=True)
+    ftp_libraries = discover_windows_libraries(home)
 
     return WebSettings(
         host=os.getenv("ABLITERADOR_WEB_HOST", "0.0.0.0"),
@@ -63,4 +77,11 @@ def load_settings() -> WebSettings:
         local_network_only=os.getenv("ABLITERADOR_LOCAL_NETWORK_ONLY", "1") == "1",
         models_cache_ttl_s=int(os.getenv("ABLITERADOR_MODELS_CACHE_TTL_S", "20")),
         rate_limit_per_minute=int(os.getenv("ABLITERADOR_RATE_LIMIT_PER_MINUTE", "120")),
+        ftp_enabled=os.getenv("ABLITERADOR_FTP_ENABLED", "1") == "1",
+        ftp_host=os.getenv("ABLITERADOR_FTP_HOST", "0.0.0.0"),
+        ftp_port=int(os.getenv("ABLITERADOR_FTP_PORT", "2121")),
+        ftp_username=os.getenv("ABLITERADOR_FTP_USER", "lanuser"),
+        ftp_password=os.getenv("ABLITERADOR_FTP_PASSWORD", "change_me_ftp"),
+        ftp_root=ftp_root,
+        ftp_libraries=ftp_libraries,
     )

@@ -49,6 +49,27 @@
       </section>
 
       <section class="block">
+        <h2>FTP LAN</h2>
+        {% if ftp_enabled %}
+        <p class="muted small">Servidor FTP activo (subida/descarga):</p>
+        <ul id="ftpUrls">
+          {% for item in ftp_urls %}
+          <li>{{ item }}</li>
+          {% endfor %}
+        </ul>
+        <p class="muted small">Raiz FTP: {{ ftp_root }}</p>
+        <p class="muted small">Bibliotecas detectadas:</p>
+        <ul>
+          {% for item in ftp_libraries %}
+          <li>{{ item }}</li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="muted small">FTP deshabilitado por configuracion.</p>
+        {% endif %}
+      </section>
+
+      <section class="block">
         <h2>Sandbox</h2>
         <p class="muted small">Directorios permitidos:</p>
         <ul>

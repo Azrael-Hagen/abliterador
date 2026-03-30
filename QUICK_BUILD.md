@@ -1,4 +1,4 @@
-# 🏗️ INSTRUCCIONES PARA COMPILAR EJECUTABLES - v0.5.0
+# 🏗️ INSTRUCCIONES PARA COMPILAR EJECUTABLES - v0.6.0
 
 Sigue estos pasos **en cada sistema operativo** para criar los ejecutables precompilados que pueden ser distribuidos.
 
@@ -59,7 +59,7 @@ cd AbliteradorStudio
 
 # O prueba servidor all-in-one:
 .\AbliteradorAllInOne.exe
-# → Debe mostrar versión + IPs LAN y dejar acceso por navegador
+# → Debe mostrar versión + IPs LAN + FTP LAN y dejar acceso por navegador/cliente FTP
 
 # Ruta exacta del ejecutable en este proyecto
 # C:\Users\Azrael\OneDrive\Documentos\Herramientas\abliterador\dist\AbliteradorAllInOne.exe
@@ -68,7 +68,7 @@ cd AbliteradorStudio
 & "C:\Users\Azrael\OneDrive\Documentos\Herramientas\abliterador\dist\AbliteradorAllInOne.exe"
 
 # 8. (Opcional Windows Server) Instala arranque automatico
-powershell -ExecutionPolicy Bypass -File .\setup_windows_server_service.ps1 -Action install -Port 8088
+powershell -ExecutionPolicy Bypass -File .\setup_windows_server_service.ps1 -Action install -Port 8088 -FtpPort 2121
 # → Instala servicio (NSSM) o tarea programada ONSTART
 ```
 

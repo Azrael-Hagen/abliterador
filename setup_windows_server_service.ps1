@@ -3,7 +3,8 @@ param(
     [string]$Action = "install",
     [string]$ServiceName = "AbliteradorAllInOne",
     [int]$Port = 8088,
-    [string]$Host = "0.0.0.0"
+    [string]$Host = "0.0.0.0",
+    [int]$FtpPort = 2121
 )
 
 $ErrorActionPreference = "Stop"
@@ -80,6 +81,9 @@ if ($Action -eq "install") {
     [Environment]::SetEnvironmentVariable("ABLITERADOR_WEB_HOST", $Host, "Machine")
     [Environment]::SetEnvironmentVariable("ABLITERADOR_WEB_PORT", "$Port", "Machine")
     [Environment]::SetEnvironmentVariable("ABLITERADOR_LOCAL_NETWORK_ONLY", "1", "Machine")
+    [Environment]::SetEnvironmentVariable("ABLITERADOR_FTP_ENABLED", "1", "Machine")
+    [Environment]::SetEnvironmentVariable("ABLITERADOR_FTP_HOST", $Host, "Machine")
+    [Environment]::SetEnvironmentVariable("ABLITERADOR_FTP_PORT", "$FtpPort", "Machine")
 
     New-Item -ItemType Directory -Path (Join-Path $ProjectRoot "logs") -Force | Out-Null
 
@@ -96,6 +100,8 @@ if ($Action -eq "install") {
     Write-Host "URLs esperadas:"
     Write-Host "  - http://127.0.0.1:$Port"
     Write-Host "  - http://<IP-LAN-DEL-SERVIDOR>:$Port"
+    Write-Host "  - ftp://127.0.0.1:$FtpPort"
+    Write-Host "  - ftp://<IP-LAN-DEL-SERVIDOR>:$FtpPort"
 }
 else {
     if (Test-Path $NssmDefaultPath) {
