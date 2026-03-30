@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+## [0.10.4] - 2026-03-30 🛡 Configurador Inteligente LAN Windows
+### Added
+- Nuevo módulo `windows_lan_setup.py`: al arrancar el executable verifica y configura automáticamente:
+  - Regla inbound de Windows Firewall para el puerto HTTP (8088)
+  - Regla inbound de Windows Firewall para el puerto FTP (2121) si habilitado
+  - URL ACL con `netsh http` para permitir binding sin admin en Windows Server
+  - Detección de conflicto de puerto con proceso responsable (PID + nombre)
+- Bandera `--configure-lan` en el ejecutable: solo configura y sale (ideal para GPO/scripts)
+- Bandera `--auto-elevate`: relanza con UAC automáticamente si se necesitan permisos admin
+- Self-heal de firewall: cada ~5 minutos el watchdog verifica que las reglas sigan activas y las restaura si se eliminaron
+- `launch_abliterador_allinone.bat`: lanzador que eleva para configurar LAN y luego arranca el servidor como usuario normal
+- Detección de conflicto de puerto al inicio: si el puerto está en uso muestra proceso responsable y aborta con mensaje claro
+
+### Changed
+- El all-in-one imprime un resumen de configuración LAN en consola al arrancar
+- VERSIONING: 0.10.3 → 0.10.4
+
 ## [0.10.3] - 2026-03-30 ✨ UI Polish & File Tools in Streaming
 ### Added
 - Markdown rendering en respuestas IA: code blocks, inline code, bold, listas, links.

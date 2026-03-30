@@ -281,7 +281,7 @@ def create_app() -> FastAPI:
     server_urls = [item.url for item in detect_server_addresses(settings.port)]
     ftp_access_urls = ftp_urls(settings.ftp_port) if settings.ftp_enabled else []
 
-    app = FastAPI(title="Abliterador Web Server", version="0.10.3")
+    app = FastAPI(title="Abliterador Web Server", version="0.10.4")
     module_dir = Path(__file__).resolve().parent
     repo_root = module_dir.parent
     assets_dir = repo_root / "sources"
