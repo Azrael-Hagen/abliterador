@@ -26,6 +26,14 @@ class WebSettings:
     ftp_password: str
     ftp_root: Path
     ftp_libraries: list[Path]
+    diagnostics_memory_path: Path
+    gui_launch_command: str
+    web_search_enabled: bool
+    web_search_timeout_s: int
+    web_search_cache_ttl_s: int
+    web_search_max_results: int
+    web_knowledge_path: Path
+    web_knowledge_max_queries: int
 
 
 def _parse_allowed_dirs(raw: str) -> list[Path]:
@@ -84,4 +92,16 @@ def load_settings() -> WebSettings:
         ftp_password=os.getenv("ABLITERADOR_FTP_PASSWORD", "change_me_ftp"),
         ftp_root=ftp_root,
         ftp_libraries=ftp_libraries,
+        diagnostics_memory_path=Path(
+            os.getenv("ABLITERADOR_DIAGNOSTICS_MEMORY", str(default_sandbox / "diagnostics_memory.json"))
+        ).resolve(),
+        gui_launch_command=os.getenv("ABLITERADOR_GUI_LAUNCH_CMD", "").strip(),
+        web_search_enabled=os.getenv("ABLITERADOR_WEB_SEARCH_ENABLED", "1") == "1",
+        web_search_timeout_s=int(os.getenv("ABLITERADOR_WEB_SEARCH_TIMEOUT_S", "8")),
+        web_search_cache_ttl_s=int(os.getenv("ABLITERADOR_WEB_SEARCH_CACHE_TTL_S", "600")),
+        web_search_max_results=int(os.getenv("ABLITERADOR_WEB_SEARCH_MAX_RESULTS", "5")),
+        web_knowledge_path=Path(
+            os.getenv("ABLITERADOR_WEB_KNOWLEDGE_PATH", str(default_sandbox / "web_knowledge.json"))
+        ).resolve(),
+        web_knowledge_max_queries=int(os.getenv("ABLITERADOR_WEB_KNOWLEDGE_MAX_QUERIES", "200")),
     )

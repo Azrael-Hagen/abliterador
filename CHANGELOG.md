@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.8.0] - 2026-03-30 🚀 Web Search Enrichment Release
+### Added
+- Búsqueda por internet desde el servidor con endpoint dedicado (`/api/web/search`) accesible desde la UI web.
+- Motor de enriquecimiento de chat con fuentes web recientes para mejorar respuestas con información actualizada.
+- Memoria persistente de conocimiento web (`web_knowledge.json`) para reutilizar contexto reciente entre sesiones.
+- Controles UI para activar/desactivar búsqueda web en chat, definir query y límite de fuentes.
+- Nuevas pruebas unitarias para búsqueda web y almacenamiento de conocimiento reciente.
+
+### Changed
+- Versionado del proyecto incrementado a 0.8.0.
+- Endpoint `/api/chat` ahora soporta enriquecimiento web opcional con trazabilidad de fuentes en `tool_events`.
+- Configuración web ampliada con variables `ABLITERADOR_WEB_SEARCH_*` y `ABLITERADOR_WEB_KNOWLEDGE_*`.
+
+### Fixed
+- Búsqueda web ahora aplica fallback entre proveedores y degrada de forma segura cuando un origen externo falla.
+
 ## [0.7.0] - 2026-03-30 🚀 Admin Studio Web Release
 ### Added
 - Registro de nuevos usuarios desde la UI web (`/api/signup`).

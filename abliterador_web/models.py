@@ -59,15 +59,33 @@ class ModelPullJobResponse(BaseModel):
     output_tail: str = ""
 
 
+class DiagnosticsRepairRequest(BaseModel):
+    actions: list[str] = Field(default_factory=list)
+
+
 class ChatRequest(BaseModel):
     model: str = Field(min_length=1, max_length=200)
     message: str = Field(min_length=1, max_length=20000)
     use_file_tools: bool = False
+    use_web_search: bool = False
+    web_query: str = Field(default="", max_length=300)
+    web_results_limit: int = Field(default=3, ge=1, le=10)
+    use_recent_web_knowledge: bool = True
 
 
 class ChatResponse(BaseModel):
     reply: str
     tool_events: list[str] = Field(default_factory=list)
+
+
+class WebSearchRequest(BaseModel):
+    query: str = Field(min_length=1, max_length=300)
+    max_results: int = Field(default=5, ge=1, le=10)
+
+
+class WebSearchResponse(BaseModel):
+    query: str
+    results: list[dict[str, str]] = Field(default_factory=list)
 
 
 class FileWriteRequest(BaseModel):

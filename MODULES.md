@@ -74,6 +74,22 @@
 - Purpose: Exponer transferencia de archivos LAN (upload/download/delete) en all-in-one.
 - Public API: start_ftp_server(), stop_ftp_server(), ftp_urls(), discover_windows_libraries().
 
+19. Desktop Launcher Resolver
+- Purpose: Resolver y lanzar GUI de escritorio de forma robusta desde el servidor web.
+- Public API: find_gui_launch_targets(), launch_desktop_gui().
+
+20. MiniAIDiagnosticsEngine
+- Purpose: Diagnóstico inteligente con memoria persistente y priorización de autorreparaciones según efectividad histórica.
+- Public API: check(), run_repair().
+
+21. WebSearchService
+- Purpose: Búsqueda de información en internet con caché temporal, fallback entre proveedores y normalización de resultados.
+- Public API: search().
+
+22. WebKnowledgeStore
+- Purpose: Persistencia de hallazgos web recientes para reutilización contextual en el chat.
+- Public API: record(), recent().
+
 ## Reuse Rules
 - Any new long-running operation must be routed through ModelTaskWorker.
 - Any new generation controls must be added to GenerationSettings first.

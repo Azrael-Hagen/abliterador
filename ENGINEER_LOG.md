@@ -1,5 +1,46 @@
 # Engineer Log
 
+## [CP-09] 2026-03-30
+Status: Passed
+Decisions made:
+- Added server-side internet search service with provider fallback and TTL cache for low-latency enrichment.
+- Added persistent web knowledge memory so newly fetched information can be reused in future prompts.
+- Extended `/api/chat` contract to optionally inject fresh web context and include source traceability via `tool_events`.
+- Added dedicated `/api/web/search` endpoint and UI controls for explicit web lookups from the browser.
+
+Trade-offs:
+- Implemented retrieval-augmented enrichment (RAG ligero) instead of model weight fine-tuning to keep deployment local, safe and fast.
+- Chosen public-source snippets (DuckDuckGo + Wikipedia API) to avoid API key dependency for baseline functionality.
+
+Debt deferred:
+- Add optional premium search provider adapters (Serper/Bing/etc.) with API keys and ranking strategy.
+- Add citation confidence scoring and source freshness metadata in the UI.
+
+Next steps:
+- Add integration tests with mocked external HTTP responses for deterministic CI.
+- Add scheduled background refresh jobs for configurable topic watchlists.
+
+## [CP-08] 2026-03-30
+Status: Passed
+Decisions made:
+- Reorganized web UI into tabbed sections (Operacion/Admin/Sistema) to improve discoverability and reduce visual overload.
+- Added robust desktop GUI launch resolver with multi-path discovery and optional `ABLITERADOR_GUI_LAUNCH_CMD` override.
+- Implemented `MiniAIDiagnosticsEngine` with persistent memory (`diagnostics_memory.json`) to learn issue/action outcomes.
+- Added intelligent diagnostics API endpoints (`/api/admin/diagnostics/ai/check` and `/api/admin/diagnostics/ai/repair`).
+- Added structured API error parsing in frontend to avoid opaque `[object Object]` messages.
+
+Trade-offs:
+- Chosen learning approach is heuristic/statistical (success-rate based) instead of remote LLM to keep latency/cost near zero and run fully offline.
+- GUI launch from web remains dependent on local availability of desktop artifacts or explicit launch command configuration.
+
+Debt deferred:
+- Add optional authenticated remote desktop bridge for environments where GUI binary is not present in server host.
+- Add integration tests against running FastAPI app for diagnostics endpoints.
+
+Next steps:
+- Validate from real LAN clients on Windows Server service mode.
+- Document recommended production values for `ABLITERADOR_GUI_LAUNCH_CMD` and diagnostics memory path.
+
 ## [CP-07] 2026-03-30
 Status: Passed
 Decisions made:

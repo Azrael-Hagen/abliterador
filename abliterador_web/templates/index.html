@@ -12,107 +12,146 @@
     <aside class="panel side">
       <h1>{{ app_name }}</h1>
       <p class="muted">Servidor remoto multiusuario</p>
+      <div class="tabbar" id="tabbar">
+        <button class="tab active" data-tab="operacion">Operacion</button>
+        <button class="tab" data-tab="admin">Admin</button>
+        <button class="tab" data-tab="sistema">Sistema</button>
+      </div>
 
-      <section class="block">
-        <h2>Login</h2>
-        <input id="username" placeholder="Usuario" value="admin" />
-        <input id="password" type="password" placeholder="Password" />
-        <button id="btnLogin">Conectar</button>
-        <p class="muted small">Credenciales iniciales: {{ default_admin_user }} / {{ default_admin_password }}</p>
-        <p id="profileInfo" class="muted small"></p>
+      <section class="tab-pane active" data-pane="operacion">
+        <section class="block">
+          <h2>Login</h2>
+          <input id="username" placeholder="Usuario" value="admin" />
+          <input id="password" type="password" placeholder="Password" />
+          <button id="btnLogin">Conectar</button>
+          <p class="muted small">Credenciales iniciales: {{ default_admin_user }} / {{ default_admin_password }}</p>
+          <p id="profileInfo" class="muted small"></p>
+        </section>
+
+        <section class="block">
+          <h2>Registro</h2>
+          <input id="signupUser" placeholder="Nuevo usuario" />
+          <input id="signupPass" type="password" placeholder="Password (8+ caracteres)" />
+          <button id="btnSignup">Suscribirse</button>
+        </section>
+
+        <section class="block">
+          <h2>Modelo</h2>
+          <select id="modelSelect"></select>
+          <button id="btnModels">Refrescar modelos</button>
+        </section>
+
+        <section class="block">
+          <h2>Sandbox</h2>
+          <p class="muted small">Directorios permitidos:</p>
+          <ul>
+            {% for item in allowed_dirs %}
+            <li>{{ item }}</li>
+            {% endfor %}
+          </ul>
+          <label class="toggle"><input id="useTools" type="checkbox" /> Permitir file tools por IA</label>
+          <label class="toggle"><input id="useWebSearch" type="checkbox" checked /> Enriquecer chat con busqueda web</label>
+          <label class="toggle"><input id="useRecentWebKnowledge" type="checkbox" checked /> Usar memoria web reciente del servidor</label>
+          <input id="webQuery" placeholder="Query web opcional (si vacio usa tu prompt)" />
+          <input id="webResultsLimit" type="number" min="1" max="10" value="3" />
+        </section>
       </section>
 
-      <section class="block">
-        <h2>Registro</h2>
-        <input id="signupUser" placeholder="Nuevo usuario" />
-        <input id="signupPass" type="password" placeholder="Password (8+ caracteres)" />
-        <button id="btnSignup">Suscribirse</button>
+      <section class="tab-pane" data-pane="admin">
+        <section id="adminBlock" class="block" style="display:none;">
+          <h2>Perfiles (Admin)</h2>
+          <input id="newUser" placeholder="Nuevo usuario" />
+          <input id="newPass" type="password" placeholder="Password inicial" />
+          <select id="newRole">
+            <option value="viewer">viewer</option>
+            <option value="operator">operator</option>
+            <option value="manager">manager</option>
+            <option value="admin">admin</option>
+          </select>
+          <button id="btnCreateUser">Crear perfil</button>
+
+          <button id="btnRefreshUsers">Actualizar catalogo usuarios</button>
+          <select id="userCatalog"></select>
+          <select id="editRole">
+            <option value="viewer">viewer</option>
+            <option value="operator">operator</option>
+            <option value="manager">manager</option>
+            <option value="admin">admin</option>
+          </select>
+          <label class="toggle"><input id="editActive" type="checkbox" checked /> Usuario activo</label>
+          <button id="btnApplyUserEdit">Aplicar cambios usuario</button>
+          <button id="btnDeleteUser" class="danger">Eliminar usuario</button>
+
+          <h2>Modelos en servidor</h2>
+          <input id="pullModelName" placeholder="Modelo para descargar (ej: qwen2.5:7b)" />
+          <button id="btnPullModel">Solicitar descarga modelo</button>
+          <p id="pullStatus" class="muted small"></p>
+
+          <h2>Desktop</h2>
+          <button id="btnLaunchGui">Abrir GUI de escritorio en servidor</button>
+        </section>
+        <section id="adminHint" class="block">
+          <p class="muted small">Acceso restringido. Inicia sesion con rol admin para gestionar usuarios y acciones de servidor.</p>
+        </section>
       </section>
 
-      <section id="adminBlock" class="block" style="display:none;">
-        <h2>Perfiles (Admin)</h2>
-        <input id="newUser" placeholder="Nuevo usuario" />
-        <input id="newPass" type="password" placeholder="Password inicial" />
-        <select id="newRole">
-          <option value="viewer">viewer</option>
-          <option value="operator">operator</option>
-          <option value="manager">manager</option>
-          <option value="admin">admin</option>
-        </select>
-        <button id="btnCreateUser">Crear perfil</button>
+      <section class="tab-pane" data-pane="sistema">
+        <section class="block">
+          <h2>Auto-reparacion</h2>
+          <button id="btnSelfHealCheck">Diagnostico basico</button>
+          <button id="btnSelfHealRun">Ejecutar reparacion basica</button>
+        </section>
 
-        <button id="btnRefreshUsers">Actualizar catalogo usuarios</button>
-        <select id="userCatalog"></select>
-        <select id="editRole">
-          <option value="viewer">viewer</option>
-          <option value="operator">operator</option>
-          <option value="manager">manager</option>
-          <option value="admin">admin</option>
-        </select>
-        <label class="toggle"><input id="editActive" type="checkbox" checked /> Usuario activo</label>
-        <button id="btnApplyUserEdit">Aplicar cambios usuario</button>
-        <button id="btnDeleteUser" class="danger">Eliminar usuario</button>
+        <section class="block">
+          <h2>Mini IA Diagnostica</h2>
+          <button id="btnAiDiagCheck">Analizar estado inteligente</button>
+          <button id="btnAiDiagRun">Aplicar autorreparacion inteligente</button>
+          <div id="aiDiagStatus" class="muted small"></div>
+        </section>
 
-        <h2>Admin Studio</h2>
-        <input id="pullModelName" placeholder="Modelo para descargar (ej: qwen2.5:7b)" />
-        <button id="btnPullModel">Solicitar descarga modelo</button>
-        <p id="pullStatus" class="muted small"></p>
+        <section class="block">
+          <h2>Busqueda Web Servidor</h2>
+          <input id="webSearchQuery" placeholder="Buscar en internet desde el servidor" />
+          <input id="webSearchLimit" type="number" min="1" max="10" value="5" />
+          <button id="btnWebSearch">Buscar ahora</button>
+          <div id="webSearchStatus" class="muted small"></div>
+        </section>
 
-        <button id="btnSelfHealCheck">Diagnostico auto-recuperacion</button>
-        <button id="btnSelfHealRun">Ejecutar auto-recuperacion</button>
-        <button id="btnLaunchGui">Abrir GUI de escritorio en servidor</button>
-      </section>
+        <section class="block">
+          <h2>Acceso LAN</h2>
+          <p class="muted small">URLs detectadas:</p>
+          <ul id="serverUrls">
+            {% for item in server_urls %}
+            <li>{{ item }}</li>
+            {% endfor %}
+          </ul>
+        </section>
 
-      <section class="block">
-        <h2>Modelo</h2>
-        <select id="modelSelect"></select>
-        <button id="btnModels">Refrescar modelos</button>
-      </section>
-
-      <section class="block">
-        <h2>Acceso LAN</h2>
-        <p class="muted small">URLs detectadas:</p>
-        <ul id="serverUrls">
-          {% for item in server_urls %}
-          <li>{{ item }}</li>
-          {% endfor %}
-        </ul>
-      </section>
-
-      <section class="block">
-        <h2>FTP LAN</h2>
-        {% if ftp_enabled %}
-        <p class="muted small">Servidor FTP activo (subida/descarga):</p>
-        <ul id="ftpUrls">
-          {% for item in ftp_urls %}
-          <li>{{ item }}</li>
-          {% endfor %}
-        </ul>
-        <p class="muted small">Raiz FTP: {{ ftp_root }}</p>
-        <p class="muted small">Bibliotecas detectadas:</p>
-        <ul>
-          {% for item in ftp_libraries %}
-          <li>{{ item }}</li>
-          {% endfor %}
-        </ul>
-        {% else %}
-        <p class="muted small">FTP deshabilitado por configuracion.</p>
-        {% endif %}
-      </section>
-
-      <section class="block">
-        <h2>Sandbox</h2>
-        <p class="muted small">Directorios permitidos:</p>
-        <ul>
-          {% for item in allowed_dirs %}
-          <li>{{ item }}</li>
-          {% endfor %}
-        </ul>
-        <label class="toggle"><input id="useTools" type="checkbox" /> Permitir file tools por IA</label>
+        <section class="block">
+          <h2>FTP LAN</h2>
+          {% if ftp_enabled %}
+          <p class="muted small">Servidor FTP activo (subida/descarga):</p>
+          <ul id="ftpUrls">
+            {% for item in ftp_urls %}
+            <li>{{ item }}</li>
+            {% endfor %}
+          </ul>
+          <p class="muted small">Raiz FTP: {{ ftp_root }}</p>
+          <p class="muted small">Bibliotecas detectadas:</p>
+          <ul>
+            {% for item in ftp_libraries %}
+            <li>{{ item }}</li>
+            {% endfor %}
+          </ul>
+          {% else %}
+          <p class="muted small">FTP deshabilitado por configuracion.</p>
+          {% endif %}
+        </section>
       </section>
     </aside>
 
     <section class="panel chat">
+      <div class="status-strip" id="statusStrip">Listo para iniciar sesion.</div>
       <div id="log" class="log"></div>
       <div class="composer">
         <textarea id="prompt" placeholder="Escribe algo... ejemplo: crea archivo notes/hola.txt con contenido 'hola mundo'"></textarea>

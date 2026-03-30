@@ -92,3 +92,31 @@ Acceptance Criteria:
 - [x] Configuración por variables `ABLITERADOR_FTP_*` documentada.
 Status: [x]
 Notes: Se corrigió normalización de rutas virtuales FTP en Windows mediante filesystem personalizado para evitar fallos de escritura en pyftpdlib.
+
+---
+
+## CP-08: UX Web + Mini IA de Autodiagnostico
+Milestone: UI web organizada por pestañas, manejo de errores más claro y autorreparación inteligente con memoria.
+Acceptance Criteria:
+- [x] UI reorganizada en navegación por pestañas (operación/admin/sistema) para reducir carga cognitiva.
+- [x] Errores API complejos se muestran en lenguaje claro en la interfaz.
+- [x] Endpoint de lanzamiento GUI robusto con múltiples rutas candidatas y comando configurable por entorno.
+- [x] Motor de autodiagnóstico con memoria persistente de incidencias y efectividad de acciones.
+- [x] Endpoints de diagnóstico inteligente (`check` + `repair`) conectados a UI.
+- [x] Pruebas unitarias para launcher y motor de diagnóstico en verde.
+Status: [x]
+Notes: Se añadió aprendizaje incremental basado en tasa de éxito histórica de acciones para priorizar autorreparaciones seguras.
+
+---
+
+## CP-09: Enriquecimiento Web y Conocimiento Reciente
+Milestone: El servidor incorpora búsqueda en internet y contexto actualizado reutilizable para mejorar respuestas del chat.
+Acceptance Criteria:
+- [x] Endpoint de búsqueda web dedicado (`/api/web/search`) operativo con permisos de chat.
+- [x] Integración opcional de contexto web en `/api/chat` con trazabilidad de fuentes usadas.
+- [x] Memoria persistente de conocimiento web reciente para reutilización entre sesiones.
+- [x] Controles en UI para activar enriquecimiento web, query específica y número de resultados.
+- [x] Fallback resiliente entre proveedores y degradación segura ante fallos de red/servicio.
+- [x] Pruebas unitarias para módulo de búsqueda y memoria de conocimiento en verde.
+Status: [x]
+Notes: Se validó E2E local con login, búsqueda web y chat enriquecido; compilación all-in-one completada.

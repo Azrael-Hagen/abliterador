@@ -53,6 +53,28 @@ body {
 .block { margin-top: 18px; border-top: 1px dashed var(--line); padding-top: 14px; }
 .block h2 { font-size: 14px; margin: 0 0 10px 0; color: var(--accent); text-transform: uppercase; letter-spacing: .8px; }
 
+.tabbar {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-top: 14px;
+}
+
+.tab {
+  margin-bottom: 0;
+  padding: 8px 10px;
+  font-size: 13px;
+  border-radius: 999px;
+}
+
+.tab.active {
+  border-color: rgba(92,225,230,.45);
+  box-shadow: 0 0 0 1px rgba(92,225,230,.3) inset;
+}
+
+.tab-pane { display: none; }
+.tab-pane.active { display: block; }
+
 input, select, textarea, button {
   width: 100%;
   border-radius: 10px;
@@ -75,6 +97,13 @@ button.danger {
 }
 
 .chat { display: flex; flex-direction: column; min-height: 0; }
+.status-strip {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .log {
   flex: 1;
   overflow: auto;
@@ -98,6 +127,20 @@ textarea { min-height: 90px; resize: vertical; }
 .small { font-size: 12px; }
 .toggle { display: flex; gap: 8px; align-items: center; font-size: 13px; color: var(--muted); }
 .toggle input { width: auto; margin: 0; }
+
+#aiDiagStatus {
+  margin-top: 8px;
+  white-space: pre-wrap;
+  max-height: 160px;
+  overflow: auto;
+}
+
+#webSearchStatus {
+  margin-top: 8px;
+  white-space: pre-wrap;
+  max-height: 180px;
+  overflow: auto;
+}
 
 @media (max-width: 900px) {
   .layout { grid-template-columns: 1fr; }

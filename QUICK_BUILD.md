@@ -1,4 +1,4 @@
-# 🏗️ INSTRUCCIONES PARA COMPILAR EJECUTABLES - v0.7.0
+# 🏗️ INSTRUCCIONES PARA COMPILAR EJECUTABLES - v0.8.0
 
 Sigue estos pasos **en cada sistema operativo** para criar los ejecutables precompilados que pueden ser distribuidos.
 

@@ -1,6 +1,6 @@
 # Abliterador Studio
 
-**Versión actual:** `v0.7.0` — *2026-03-30* 🚀
+**Versión actual:** `v0.8.0` — *2026-03-30* 🚀
 
 Aplicacion GUI en PySide6 para buscar modelos, cargarlos localmente, aplicar abliteración y probar generacion de texto.
 
@@ -27,6 +27,7 @@ python abliterador_studio.py
 
 | Versión | Fecha | Cambios principales |
 |---------|-------|---------------------|
+| `0.8.0` | 2026-03-30 | **Web Search Enrichment:** búsqueda internet desde UI servidor, contexto web actualizado en chat y memoria persistente de conocimiento reciente |
 | `0.7.0` | 2026-03-30 | **Admin Studio Web:** registro de usuarios, catálogo de roles/permisos, descargas de modelos, auto-recuperación y lanzamiento de GUI de escritorio |
 | `0.6.0` | 2026-03-30 | **FTP LAN estilo nube local:** subida/descarga en bibliotecas de Windows, integrado al all-in-one con visibilidad de estado |
 | `0.5.0` | 2026-03-29 | **Servidor LAN all-in-one:** hardening web, perfil multiusuario aislado, IP visible, servicio Windows Server, catálogo ampliado |
@@ -131,6 +132,20 @@ set ABLITERADOR_FTP_ROOT=C:\Users\Azrael
 # Ollama remoto/local (OpenAI-compatible endpoint de Ollama)
 set ABLITERADOR_OLLAMA_URL=http://127.0.0.1:11434
 
+# Mini IA de diagnostico/autorreparacion
+set ABLITERADOR_DIAGNOSTICS_MEMORY=C:\\data\\abliterador_diagnostics_memory.json
+
+# Busqueda web e inteligencia con informacion actualizada
+set ABLITERADOR_WEB_SEARCH_ENABLED=1
+set ABLITERADOR_WEB_SEARCH_TIMEOUT_S=8
+set ABLITERADOR_WEB_SEARCH_CACHE_TTL_S=600
+set ABLITERADOR_WEB_SEARCH_MAX_RESULTS=5
+set ABLITERADOR_WEB_KNOWLEDGE_PATH=C:\\data\\abliterador_web_knowledge.json
+set ABLITERADOR_WEB_KNOWLEDGE_MAX_QUERIES=200
+
+# Comando opcional para lanzar GUI de escritorio desde web admin
+set ABLITERADOR_GUI_LAUNCH_CMD=cmd /c C:\\ruta\\launch_abliterador_studio.bat
+
 # Base de perfiles y espacios de usuario
 set ABLITERADOR_USERS_DB=C:\\data\\abliterador_users.json
 set ABLITERADOR_USER_WORKSPACES_ROOT=C:\\data\\abliterador_workspaces
@@ -193,6 +208,8 @@ Admin Studio Web (solo administradores):
 - Catálogo de roles usuales y permisos: `admin`, `manager`, `operator`, `viewer`.
 - Solicitud de descarga de modelos en servidor (`ollama pull`) con estado por job.
 - Diagnóstico y ejecución de auto-recuperación del servidor.
+- Mini IA de autodiagnóstico con memoria de incidencias y priorización de acciones de autorreparación.
+- Búsqueda web en servidor y enriquecimiento opcional del chat con fuentes recientes.
 - Lanzamiento de la GUI de escritorio (`AbliteradorStudio`) desde el panel web admin.
 
 Registro de nuevos usuarios:

@@ -6,7 +6,7 @@
 - **MINOR:** New user-visible features that preserve existing flows (e.g., new backend option, new export format).
 - **PATCH:** Bug fixes, security patches, and non-breaking improvements (e.g., faster load, UI polish).
 
-**Current Version:** `0.4.0` (Distribution infrastructure release)
+**Current Version:** `0.8.0` (Web search enrichment release)
 
 ## Distribution & Releases
 

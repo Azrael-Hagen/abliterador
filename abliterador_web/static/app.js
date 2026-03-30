@@ -9,6 +9,10 @@ const modelSelect = document.getElementById("modelSelect");
 const btnSend = document.getElementById("btnSend");
 const prompt = document.getElementById("prompt");
 const useTools = document.getElementById("useTools");
+const useWebSearch = document.getElementById("useWebSearch");
+const useRecentWebKnowledge = document.getElementById("useRecentWebKnowledge");
+const webQuery = document.getElementById("webQuery");
+const webResultsLimit = document.getElementById("webResultsLimit");
 const profileInfo = document.getElementById("profileInfo");
 const adminBlock = document.getElementById("adminBlock");
 const newUser = document.getElementById("newUser");
@@ -32,6 +36,17 @@ const pullStatus = document.getElementById("pullStatus");
 const btnSelfHealCheck = document.getElementById("btnSelfHealCheck");
 const btnSelfHealRun = document.getElementById("btnSelfHealRun");
 const btnLaunchGui = document.getElementById("btnLaunchGui");
+const btnAiDiagCheck = document.getElementById("btnAiDiagCheck");
+const btnAiDiagRun = document.getElementById("btnAiDiagRun");
+const aiDiagStatus = document.getElementById("aiDiagStatus");
+const statusStrip = document.getElementById("statusStrip");
+const adminHint = document.getElementById("adminHint");
+const webSearchQuery = document.getElementById("webSearchQuery");
+const webSearchLimit = document.getElementById("webSearchLimit");
+const btnWebSearch = document.getElementById("btnWebSearch");
+const webSearchStatus = document.getElementById("webSearchStatus");
+const tabs = Array.from(document.querySelectorAll(".tab"));
+const panes = Array.from(document.querySelectorAll(".tab-pane"));
 
 let roleCatalog = {};
 
@@ -41,6 +56,32 @@ function addMsg(role, text) {
   div.textContent = text;
   log.appendChild(div);
   log.scrollTop = log.scrollHeight;
+}
+
+function setStatus(text) {
+  if (statusStrip) statusStrip.textContent = text;
+}
+
+function parseApiError(data) {
+  if (!data) return "Error de API";
+  if (typeof data.detail === "string") return data.detail;
+  if (data.detail && typeof data.detail === "object") {
+    if (typeof data.detail.message === "string") {
+      const hint = data.detail.hint ? ` | ${data.detail.hint}` : "";
+      return `${data.detail.message}${hint}`;
+    }
+    return JSON.stringify(data.detail);
+  }
+  return data.message || "Error de API";
+}
+
+function setActiveTab(tabName) {
+  tabs.forEach((tab) => {
+    tab.classList.toggle("active", tab.dataset.tab === tabName);
+  });
+  panes.forEach((pane) => {
+    pane.classList.toggle("active", pane.dataset.pane === tabName);
+  });
 }
 
 async function api(path, payload) {
@@ -55,7 +96,7 @@ async function api(path, payload) {
 
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(data.detail || "Error de API");
+    throw new Error(parseApiError(data));
   }
   return data;
 }
@@ -67,7 +108,7 @@ async function apiGet(path) {
   const res = await fetch(path, { headers });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(data.detail || "Error de API");
+    throw new Error(parseApiError(data));
   }
   return data;
 }
@@ -93,12 +134,15 @@ async function loadModels() {
     modelSelect.appendChild(opt);
   }
   addMsg("tool", `Modelos cargados: ${(data.models || []).length}`);
+  setStatus(`Modelos disponibles: ${(data.models || []).length}`);
 }
 
 async function loadProfile() {
   const data = await apiGet("/api/me");
   profileInfo.textContent = `Perfil: ${data.username} (${data.role}) | Activo: ${data.active} | Espacio: ${data.workspace}`;
   adminBlock.style.display = data.role === "admin" ? "block" : "none";
+  if (adminHint) adminHint.style.display = data.role === "admin" ? "none" : "block";
+  setStatus(`Sesion activa: ${data.username} (${data.role})`);
 }
 
 async function loadServerInfo() {
@@ -160,6 +204,7 @@ btnLogin.addEventListener("click", async () => {
     });
     token = data.token;
     addMsg("tool", "Autenticado correctamente.");
+    setActiveTab("operacion");
     await loadProfile();
     await loadServerInfo();
     await loadRoles();
@@ -169,6 +214,7 @@ btnLogin.addEventListener("click", async () => {
     await loadModels();
   } catch (err) {
     addMsg("tool", `Login error: ${err.message}`);
+    setStatus("Error de autenticacion");
   }
 });
 
@@ -180,6 +226,7 @@ btnSignup.addEventListener("click", async () => {
     };
     const data = await api("/api/signup", payload);
     addMsg("tool", `Registro OK: ${data.username} (${data.role}). Ya puedes iniciar sesión.`);
+    setStatus(`Registro creado para ${data.username}`);
     signupUser.value = "";
     signupPass.value = "";
   } catch (err) {
@@ -212,6 +259,10 @@ btnSend.addEventListener("click", async () => {
       model,
       message,
       use_file_tools: useTools.checked,
+      use_web_search: Boolean(useWebSearch?.checked),
+      web_query: webQuery?.value?.trim() || "",
+      web_results_limit: Number(webResultsLimit?.value || 3),
+      use_recent_web_knowledge: Boolean(useRecentWebKnowledge?.checked),
     });
 
     if (Array.isArray(data.tool_events)) {
@@ -328,6 +379,7 @@ btnSelfHealCheck?.addEventListener("click", async () => {
   try {
     const data = await apiGet("/api/admin/self-heal/check");
     addMsg("tool", `Self-heal check: ok=${data.ok} issues=${(data.issues || []).join(", ") || "ninguna"}`);
+    setStatus(`Diagnostico basico: ${data.ok ? "sin problemas" : "con incidencias"}`);
   } catch (err) {
     addMsg("tool", `Self-heal check error: ${err.message}`);
   }
@@ -337,6 +389,7 @@ btnSelfHealRun?.addEventListener("click", async () => {
   try {
     const data = await api("/api/admin/self-heal/run", {});
     addMsg("tool", `Self-heal run: acciones=${(data.actions || []).join(", ") || "ninguna"}`);
+    setStatus("Auto-reparacion basica ejecutada");
   } catch (err) {
     addMsg("tool", `Self-heal run error: ${err.message}`);
   }
@@ -346,7 +399,67 @@ btnLaunchGui?.addEventListener("click", async () => {
   try {
     const data = await api("/api/admin/gui/launch", {});
     addMsg("tool", `GUI lanzada: ${data.launched}`);
+    setStatus("GUI de escritorio lanzada");
   } catch (err) {
     addMsg("tool", `Lanzar GUI error: ${err.message}`);
+    setStatus("No se pudo lanzar la GUI");
   }
+});
+
+btnAiDiagCheck?.addEventListener("click", async () => {
+  try {
+    const data = await apiGet("/api/admin/diagnostics/ai/check");
+    const findings = data.findings || [];
+    const lines = findings.length
+      ? findings.map((f) => `- [${f.severity}] ${f.code}: ${f.message}\n  acciones: ${(f.recommended_actions || []).join(", ") || "ninguna"}`)
+      : ["Sin incidencias detectadas."];
+    if (aiDiagStatus) aiDiagStatus.textContent = lines.join("\n");
+    addMsg("tool", `Mini IA diagnostica: ${findings.length} incidencia(s).`);
+    setStatus(findings.length ? "Mini IA detecto incidencias" : "Mini IA: sistema estable");
+  } catch (err) {
+    addMsg("tool", `Mini IA check error: ${err.message}`);
+  }
+});
+
+btnAiDiagRun?.addEventListener("click", async () => {
+  try {
+    const data = await api("/api/admin/diagnostics/ai/repair", { actions: [] });
+    const executed = data.executed || [];
+    const summary = executed.length
+      ? executed.map((item) => `- ${item.action}: ${item.ok ? "ok" : "manual/error"} (${item.detail})`).join("\n")
+      : "No hubo acciones a ejecutar.";
+    if (aiDiagStatus) aiDiagStatus.textContent = summary;
+    addMsg("tool", `Mini IA reparacion ejecutada: ${executed.length} accion(es).`);
+    setStatus("Mini IA aplico autorreparacion");
+  } catch (err) {
+    addMsg("tool", `Mini IA repair error: ${err.message}`);
+  }
+});
+
+btnWebSearch?.addEventListener("click", async () => {
+  try {
+    const query = (webSearchQuery?.value || "").trim();
+    if (!query) {
+      addMsg("tool", "Ingresa una consulta para busqueda web.");
+      return;
+    }
+    const maxResults = Number(webSearchLimit?.value || 5);
+    const data = await api("/api/web/search", { query, max_results: maxResults });
+    const rows = data.results || [];
+    if (webSearchStatus) {
+      webSearchStatus.textContent = rows.length
+        ? rows.map((r, i) => `${i + 1}. ${r.title} | ${r.url}`).join("\n")
+        : "Sin resultados para la consulta.";
+    }
+    addMsg("tool", `Busqueda web: ${rows.length} resultado(s).`);
+    rows.forEach((row, idx) => addMsg("tool", `[WEB ${idx + 1}] ${row.title} -> ${row.url}`));
+    setStatus(`Busqueda web completada (${rows.length} resultados)`);
+  } catch (err) {
+    addMsg("tool", `Busqueda web error: ${err.message}`);
+    setStatus("Busqueda web no disponible");
+  }
+});
+
+tabs.forEach((tab) => {
+  tab.addEventListener("click", () => setActiveTab(tab.dataset.tab));
 });
