@@ -25,6 +25,7 @@ import shutil
 import argparse
 import subprocess
 import importlib.util
+import time
 from pathlib import Path
 
 
@@ -88,17 +89,26 @@ def get_pyinstaller_args(
 def clean_build_artifacts():
     """Remove previous build artifacts."""
     dirs_to_remove = ["build", "dist", "__pycache__", "*.egg-info"]
+
+    def _safe_rmtree(path_obj: Path) -> None:
+        for _ in range(3):
+            try:
+                shutil.rmtree(path_obj, ignore_errors=False)
+                return
+            except Exception:
+                time.sleep(0.4)
+        shutil.rmtree(path_obj, ignore_errors=True)
     
     for pattern in dirs_to_remove:
         if "*" in pattern:
             for item in Path(".").glob(pattern):
                 if item.is_dir():
                     print(f"[>>] Removing {item}...")
-                    shutil.rmtree(item, ignore_errors=True)
+                    _safe_rmtree(item)
         else:
             if Path(pattern).exists():
                 print(f"[>>] Removing {pattern}...")
-                shutil.rmtree(pattern, ignore_errors=True)
+                _safe_rmtree(Path(pattern))
 
 
 def build_executable(
