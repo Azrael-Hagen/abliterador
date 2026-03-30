@@ -11,7 +11,7 @@
   <main class="layout">
     <aside class="panel side">
       <header class="brand">
-        <img src="/assets/Copilot_20260327_161839.png" alt="Logo Abliterador" class="brand-logo" />
+        <img src="/assets/Logo%20Abliterator%20Nex.png" alt="Logo Abliterador Nexus" class="brand-logo" />
         <div>
           <h1>{{ app_name }}</h1>
           <p class="muted">Servidor remoto multiusuario</p>
@@ -193,18 +193,30 @@
       <div class="status-strip" id="statusStrip">Listo para iniciar sesion.</div>
       <div class="chat-toolbar">
         <span id="chatModelBadge" class="badge">Modelo: -</span>
+        <div class="chat-chips">
+          <span id="connBadge" class="badge badge-soft">Servidor: verificando...</span>
+          <span class="badge badge-soft">Enter enviar | Shift+Enter salto</span>
+        </div>
         <div id="progressIndicator" class="progress-inline">
           <div id="spinner" class="spinner"></div>
           <small id="progressText" class="muted">Listo</small>
         </div>
       </div>
-      <div id="log" class="log"></div>
+      <div id="log" class="log">
+        <div id="chatEmptyState" class="chat-empty">
+          <strong>Abliterador Nexus</strong>
+          <span>Selecciona un modelo, escribe tu mensaje y presiona Enter para responder rapido.</span>
+        </div>
+      </div>
       <div class="composer">
         <textarea id="prompt" placeholder="Escribe tu pregunta o comando..."></textarea>
-        <button id="btnSend">Enviar</button>
+        <div class="composer-actions">
+          <button id="btnSend">Enviar</button>
+          <button id="btnCancel" class="ghost" disabled>Cancelar</button>
+        </div>
       </div>
     </section>
   </main>
-  <script src="/static/app.js"></script>
+  <script type="module" src="/static/app.js"></script>
 </body>
 </html>

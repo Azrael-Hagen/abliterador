@@ -1,6 +1,6 @@
 # Abliterador Studio
 
-**Versión actual:** `v0.10.0` — *2026-03-30* 🎨
+**Versión actual:** `v0.10.1` — *2026-03-30* 🎨
 
 Aplicacion GUI en PySide6 para buscar modelos, cargarlos localmente, aplicar abliteración y probar generacion de texto.
 
@@ -27,6 +27,7 @@ python abliterador_studio.py
 
 | Versión | Fecha | Cambios principales |
 |---------|-------|---------------------|
+| `0.10.1` | 2026-03-30 | **Polish UX Chat + Branding:** envio con Enter, cancelar generacion en chat, estado de conexion visible, burbujas y composer mejorados, logo Nexus en web y logo normal en GUI |
 | `0.10.0` | 2026-03-30 | **UX Unificada Web:** modelo global para toda la UI, modelo visible en cada respuesta, catálogo guiado de descargas, transferencias upload/download y logo aplicado en web |
 | `0.9.0` | 2026-03-30 | **UX Overhaul & Chat Quality:** tabs de chat/archivos, progreso visual y verificación heurística de coherencia |
 | `0.8.0` | 2026-03-30 | **Web Search Enrichment:** búsqueda internet desde UI servidor, contexto web actualizado en chat y memoria persistente de conocimiento reciente |

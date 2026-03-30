@@ -1,15 +1,16 @@
-# Release Audit v0.10.0
+# Release Audit v0.10.1
 
 Fecha de validacion: 2026-03-30
 Entorno: Windows local (127.0.0.1:8088)
 
 ## Revision de recursos requeridos
 
-- OK | resource:release/AbliteradorAllInOne_v0.10.0.exe | found
+- OK | resource:dist/AbliteradorAllInOne.exe | found
 - OK | resource:abliterador_web/templates/index.html | found
 - OK | resource:abliterador_web/static/app.js | found
 - OK | resource:abliterador_web/static/style.css | found
-- OK | resource:sources/Copilot_20260327_161839.png | found
+- OK | resource:sources/Logo Abliterator Nex.png | found
+- OK | resource:sources/Logo Abliterator Nex1.png | found
 - OK | resource:README.md | found
 - OK | resource:CHANGELOG.md | found
 
@@ -26,3 +27,20 @@ Entorno: Windows local (127.0.0.1:8088)
 ## Resultado
 
 - PASS | E2E y auditoria de recursos completados sin fallas bloqueantes.
+
+## Revalidacion 2026-03-30 (post-refactor UI + recompilacion)
+
+- OK | static module | `/static/app.js` 200
+- OK | static module | `/static/app_core.js` 200
+- OK | static module | `/static/app_files.js` 200
+- OK | static module | `/static/app_users.js` 200
+- OK | API smoke | health/login/me/server_info/models/catalog/files/chat_quality = 200
+- OK | dist exe runtime | `dist/AbliteradorAllInOne.exe` inicia sin runtime crash
+- OK | dist exe assets | `/assets/Logo%20Abliterator%20Nex.png` = 200
+- OK | dist exe assets | `/assets/Logo%20Abliterator%20Nex1.png` = 200
+
+## Revalidacion 2026-03-30 (UI references + chat polish)
+
+- OK | UI chat | estado vacio informativo y chips de estado visibles
+- OK | UI chat | `Enter` envia y `Shift+Enter` conserva salto de linea
+- OK | UI chat | boton cancelar aborta solicitud en curso sin recargar pagina

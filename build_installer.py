@@ -79,6 +79,8 @@ def get_pyinstaller_args(
 
     # Include web assets for packaged FastAPI frontend
     args.append("--collect-data=abliterador_web")
+    if Path("sources").exists():
+        args.append(f"--add-data=sources{os.pathsep}sources")
     
     # Entrypoint
     args.append(entrypoint)

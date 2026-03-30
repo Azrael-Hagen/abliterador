@@ -885,8 +885,15 @@ class ModelSearcher(QWidget):
 
     def _resolve_logo_path(self) -> Path | None:
         base_dir = Path(__file__).resolve().parents[2]
-        candidate = base_dir / "sources" / "Copilot_20260327_161839.png"
-        return candidate if candidate.exists() else None
+        candidates = [
+            base_dir / "sources" / "Logo Abliterator Nex1.png",
+            base_dir / "sources" / "Copilot_20260327_161839.png",
+            base_dir / "sources" / "Logo Abliterator Nex.png",
+        ]
+        for candidate in candidates:
+            if candidate.exists():
+                return candidate
+        return None
 
     def _selected_backend_mode(self):
         return self.backend_selector.currentData()

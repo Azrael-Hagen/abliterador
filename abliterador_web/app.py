@@ -280,12 +280,15 @@ def create_app() -> FastAPI:
     server_urls = [item.url for item in detect_server_addresses(settings.port)]
     ftp_access_urls = ftp_urls(settings.ftp_port) if settings.ftp_enabled else []
 
-    app = FastAPI(title="Abliterador Web Server", version="0.10.0")
+    app = FastAPI(title="Abliterador Web Server", version="0.10.1")
     module_dir = Path(__file__).resolve().parent
     repo_root = module_dir.parent
+    assets_dir = repo_root / "sources"
+    if not assets_dir.exists():
+        assets_dir = module_dir / "static"
     templates = Jinja2Templates(directory=str(module_dir / "templates"))
     app.mount("/static", StaticFiles(directory=str(module_dir / "static")), name="static")
-    app.mount("/assets", StaticFiles(directory=str(repo_root / "sources")), name="assets")
+    app.mount("/assets", StaticFiles(directory=str(assets_dir), check_dir=False), name="assets")
 
     @app.middleware("http")
     async def local_network_guard(request: Request, call_next):

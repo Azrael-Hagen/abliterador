@@ -6,7 +6,7 @@
 - **MINOR:** New user-visible features that preserve existing flows (e.g., new backend option, new export format).
 - **PATCH:** Bug fixes, security patches, and non-breaking improvements (e.g., faster load, UI polish).
 
-**Current Version:** `0.10.0` (UX unificada, modelo global y transferencias web release)
+**Current Version:** `0.10.1` (polish UX chat, cancelacion, Enter-to-send y branding Nexus/web + GUI)
 
 ## Distribution & Releases
 

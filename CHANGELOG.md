@@ -1,12 +1,41 @@
 # Changelog
 
 ## [Unreleased]
+
+## [0.10.1] - 2026-03-30 🎨 Chat UX & Branding Polish Release
+### Added
+- Envio rapido de chat con `Enter` (y `Shift+Enter` para salto de linea).
+- Accion `Cancelar` para abortar generacion en curso desde la UI web.
+- Badge de conectividad de servidor en vivo y estado vacio informativo del panel de chat.
+
+### Changed
+- Estilizado de chat con mejor jerarquia visual: burbujas por rol, espaciado, chips de estado y composer optimizado.
+- Branding actualizado: logo Nexus para web y logo normal para GUI (con fallback resiliente).
+- Version del proyecto incrementada a `0.10.1`.
+
+### Fixed
+- Interaccion de chat mas fluida en uso intensivo, evitando envios duplicados durante generacion.
+
+### References
+- LobeHub visuals and layout inspiration: https://github.com/lobehub/lobehub
+- NextChat screenshots and chat ergonomics: https://github.com/ChatGPTNextWeb/NextChat
+- Open WebUI status-rich patterns: https://github.com/open-webui/open-webui
+- UX heuristic for status visibility: https://www.nngroup.com/articles/visibility-system-status/
+- Visual hierarchy principles: https://ixdf.org/literature/topics/visual-hierarchy
+
+## [Unreleased]
 ### Added
 - `RELEASE_REQUIREMENTS_V1.md` con criterios de publicacion v1.0.0 y diseno de bootstrap inteligente para autoinstalacion de recursos.
 - `RELEASE_AUDIT.md` con evidencia de auditoria de recursos y smoke E2E de endpoints criticos.
+- Modularizacion de UI web en modulos reutilizables: `app_core.js`, `app_files.js`, `app_users.js`.
 
 ### Changed
 - `.gitignore` actualizado para excluir temporales de build (`.pyi_work/`) y ejecutables locales de `release/`.
+- Frontend web ahora carga JS como modulo (`type="module"`) para separar responsabilidades.
+- Build de PyInstaller ahora incluye carpeta `sources` en el bundle all-in-one.
+
+### Fixed
+- Runtime crash del exe all-in-one cuando faltaba directorio de assets en entorno PyInstaller (`/assets` ahora tolera ausencia y usa fallback).
 
 ## [0.10.0] - 2026-03-30 🎨 UX Unificada Web Release
 ### Added
