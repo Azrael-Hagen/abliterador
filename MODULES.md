@@ -90,6 +90,14 @@
 - Purpose: Persistencia de hallazgos web recientes para reutilización contextual en el chat.
 - Public API: record(), recent().
 
+23. ChatQualityChecker
+- Purpose: Validación ligera de respuestas LLM sin requerir LLM adicional (heurísticas para coherencia, repetición, patrones sin sentido).
+- Public API: check_response(), get_quality_summary().
+
+24. FileManager
+- Purpose: Gestión completa de archivos del workspace con seguridad (protección traverse, operaciones copy/move/delete, preview, búsqueda).
+- Public API: list_files(), get_preview(), copy_file(), move_file(), delete_file(), create_folder(), search().
+
 ## Reuse Rules
 - Any new long-running operation must be routed through ModelTaskWorker.
 - Any new generation controls must be added to GenerationSettings first.

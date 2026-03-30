@@ -463,3 +463,301 @@ btnWebSearch?.addEventListener("click", async () => {
 tabs.forEach((tab) => {
   tab.addEventListener("click", () => setActiveTab(tab.dataset.tab));
 });
+
+// ===== NEW: Chat & File Manager Enhancements (v0.9+) =====
+
+// DOM elements for enhanced chat
+const modelSelectMain = document.getElementById("modelSelectMain");
+const modelSelectChat = document.getElementById("modelSelectChat");
+const btnRefreshModelsChat = document.getElementById("btnRefreshModelsChat");
+const useQualityCheck = document.getElementById("useQualityCheck");
+const useToolsChat = document.getElementById("useToolsChat");
+const useWebSearchChat = document.getElementById("useWebSearchChat");
+const useWebKnowledgeChat = document.getElementById("useWebKnowledgeChat");
+const webQueryChat = document.getElementById("webQueryChat");
+const webResultsLimitChat = document.getElementById("webResultsLimitChat");
+
+// DOM elements for file manager
+const fileBrowser = document.getElementById("fileBrowser");
+const fileListStatus = document.getElementById("fileListStatus");
+const fileList = document.getElementById("fileList");
+const searchFiles = document.getElementById("searchFiles");
+const btnSearchFiles = document.getElementById("btnSearchFiles");
+const btnNewFolder = document.getElementById("btnNewFolder");
+
+// Progress indicator
+const spinner = document.getElementById("spinner");
+const progressText = document.getElementById("progressText");
+
+// Helper: Show/hide progress spinner
+function setProgress(active, text = "Generando...") {
+  if (!spinner || !progressText) return;
+  if (active) {
+    spinner.style.display = "block";
+    progressText.textContent = text;
+  } else {
+    spinner.style.display = "none";
+    progressText.textContent = "Listo";
+  }
+}
+
+// Load and display files from workspace
+async function loadFileList() {
+  if (!token || !fileList) return;
+  try {
+    fileListStatus.textContent = "Cargando archivos...";
+    const res = await fetch("/api/files/manager/list", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ path: "", filter_type: null }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Error loading files");
+
+    fileList.innerHTML = "";
+    if (!data.files || data.files.length === 0) {
+      fileListStatus.textContent = "Workspace vacío";
+      return;
+    }
+
+    fileListStatus.textContent = `${data.files.length} archivo(s):`;
+    data.files.forEach((file) => {
+      const item = document.createElement("div");
+      item.className = `file-item ${file.is_dir ? "folder" : "file"}`;
+      item.innerHTML = `
+        <div class="file-icon">${file.is_dir ? "📁" : "📄"}</div>
+        <div class="file-info">
+          <span>${file.name}</span>
+          <span class="muted small">${file.size_readable}</span>
+        </div>
+        <div class="file-actions">
+          <button onclick="previewFile('${file.path}')">👁</button>
+          <button onclick="deleteFileItem('${file.path}')">🗑</button>
+        </div>
+      `;
+      fileList.appendChild(item);
+    });
+  } catch (err) {
+    fileListStatus.textContent = `Error: ${err.message}`;
+  }
+}
+
+// Preview file
+async function previewFile(path) {
+  try {
+    const res = await fetch("/api/files/manager/preview", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ path }),
+    });
+    const data = await res.json();
+    if (data.content) {
+      addMsg("tool", `Preview de ${path}:\n${data.content.substring(0, 500)}${data.truncated ? "...[truncado]" : ""}`);
+    } else {
+      addMsg("tool", `No se puede previsualizar ${path}: ${data.reason || "tipo no soportado"}`);
+    }
+  } catch (err) {
+    addMsg("tool", `Error en preview: ${err.message}`);
+  }
+}
+
+// Delete file
+async function deleteFileItem(path) {
+  if (!confirm(`¿Eliminar ${path}?`)) return;
+  try {
+    const res = await fetch("/api/files/manager/delete", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ path }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      addMsg("tool", `Archivo eliminado: ${path}`);
+      await loadFileList();
+    } else {
+      throw new Error(data.detail || "Error deleting file");
+    }
+  } catch (err) {
+    addMsg("tool", `Error al eliminar: ${err.message}`);
+  }
+}
+
+// Create new folder
+async function createNewFolder() {
+  const folderName = prompt("Nombre de la carpeta:");
+  if (!folderName) return;
+  try {
+    const res = await fetch("/api/files/manager/mkdir", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ path: folderName }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      addMsg("tool", `Carpeta creada: ${data.path}`);
+      await loadFileList();
+    } else {
+      throw new Error(data.detail || "Error creating folder");
+    }
+  } catch (err) {
+    addMsg("tool", `Error al crear carpeta: ${err.message}`);
+  }
+}
+
+// Search files
+async function searchFilesFunc() {
+  const query = searchFiles?.value?.trim();
+  if (!query) return;
+  try {
+    const res = await fetch("/api/files/manager/search", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ query, limit: 50 }),
+    });
+    const data = await res.json();
+    if (res.ok && data.results) {
+      fileList.innerHTML = "";
+      fileListStatus.textContent = `${data.results.length} resultado(s) para "${query}":`;
+      data.results.forEach((file) => {
+        const item = document.createElement("div");
+        item.className = `file-item ${file.is_dir ? "folder" : "file"}`;
+        item.innerHTML = `
+          <div class="file-icon">${file.is_dir ? "📁" : "📄"}</div>
+          <div class="file-info">
+            <span>${file.name}</span>
+            <span class="muted small">${file.size_readable}</span>
+          </div>
+        `;
+        fileList.appendChild(item);
+      });
+    }
+  } catch (err) {
+    addMsg("tool", `Error en búsqueda: ${err.message}`);
+  }
+}
+
+// Update UI references after login
+async function updateChatUI() {
+  if (!token) return;
+  // Sync model selectors
+  try {
+    const res = await fetch("/api/models", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await res.json();
+    const models = data.models || [];
+    
+    // Update both model selectors
+    [modelSelect, modelSelectMain, modelSelectChat].forEach((sel) => {
+      if (!sel) return;
+      sel.innerHTML = "";
+      models.forEach((m) => {
+        const opt = document.createElement("option");
+        opt.value = m;
+        opt.textContent = m;
+        sel.appendChild(opt);
+      });
+    });
+  } catch (err) {
+    console.error("Error loading models for UI:", err);
+  }
+  
+  // Load initial file list
+  await loadFileList();
+}
+
+// Event listeners for file manager
+if (btnRefreshModelsChat) {
+  btnRefreshModelsChat.addEventListener("click", async () => {
+    await updateChatUI();
+    addMsg("tool", "Modelos y archivos actualizados.");
+  });
+}
+
+if (btnSearchFiles) {
+  btnSearchFiles.addEventListener("click", searchFilesFunc);
+}
+
+if (btnNewFolder) {
+  btnNewFolder.addEventListener("click", createNewFolder);
+}
+
+// Override btnSend to support quality checking
+if (btnSend && modelSelectMain) {
+  btnSend.removeEventListener("click", null); // Remove old listener
+  btnSend.addEventListener("click", async () => {
+    try {
+      const message = prompt?.value?.trim();
+      if (!message) return;
+      
+      const model = modelSelectMain?.value || modelSelect?.value;
+      if (!model) {
+        addMsg("tool", "Selecciona un modelo primero.");
+        return;
+      }
+
+      addMsg("user", message);
+      prompt.value = "";
+      setProgress(true, "Conectando con modelo...");
+
+      // Determine which endpoint to use
+      const useQuality = useQualityCheck?.checked ?? true;
+      const endpoint = useQuality ? "/api/chat/quality" : "/api/chat";
+
+      const data = await api(endpoint, {
+        model,
+        message,
+        use_file_tools: useToolsChat?.checked || useTools?.checked || false,
+        use_web_search: useWebSearchChat?.checked || useWebSearch?.checked || false,
+        web_query: webQueryChat?.value?.trim() || webQuery?.value?.trim() || "",
+        web_results_limit: Number(webResultsLimitChat?.value || webResultsLimit?.value || 3),
+        use_recent_web_knowledge: useWebKnowledgeChat?.checked || useRecentWebKnowledge?.checked || false,
+      });
+
+      setProgress(false);
+
+      if (Array.isArray(data.tool_events)) {
+        for (const event of data.tool_events) {
+          if (event.includes("quality")) {
+            addMsg("tool", `[QA] ${event}`);
+          } else if (event.includes("web")) {
+            addMsg("tool", `[WEB] ${event}`);
+          } else {
+            addMsg("tool", event);
+          }
+        }
+      }
+      addMsg("ai", data.reply || "(sin respuesta)");
+      setStatus("Listo");
+    } catch (err) {
+      setProgress(false);
+      addMsg("tool", `Chat error: ${err.message}`);
+      setStatus("Error en chat");
+    }
+  });
+}
+
+// Hook into existing loadProfile to also update chat UI
+const origLoadProfile = typeof loadProfile !== "undefined" ? loadProfile : null;
+if (typeof loadProfile === "function") {
+  const original = loadProfile;
+  loadProfile = async function() {
+    await original();
+    await updateChatUI();
+  };
+}

@@ -14,6 +14,8 @@
       <p class="muted">Servidor remoto multiusuario</p>
       <div class="tabbar" id="tabbar">
         <button class="tab active" data-tab="operacion">Operacion</button>
+        <button class="tab" data-tab="chat">Chat IA</button>
+        <button class="tab" data-tab="archivos">Archivos</button>
         <button class="tab" data-tab="admin">Admin</button>
         <button class="tab" data-tab="sistema">Sistema</button>
       </div>
@@ -54,6 +56,38 @@
           <label class="toggle"><input id="useRecentWebKnowledge" type="checkbox" checked /> Usar memoria web reciente del servidor</label>
           <input id="webQuery" placeholder="Query web opcional (si vacio usa tu prompt)" />
           <input id="webResultsLimit" type="number" min="1" max="10" value="3" />
+        </section>
+      </section>
+
+      <section class="tab-pane" data-pane="chat">
+        <section class="block">
+          <h2>Seleccionar Modelo</h2>
+          <p class="muted small">Modelos disponibles:</p>
+          <select id="modelSelectChat"></select>
+          <button id="btnRefreshModelsChat">Actualizar</button>
+        </section>
+        <section class="block">
+          <h2>Opciones de Enriquecimiento</h2>
+          <label class="toggle"><input id="useQualityCheck" type="checkbox" checked /> Verificar calidad de respuesta</label>
+          <label class="toggle"><input id="useToolsChat" type="checkbox" /> Permitir file tools</label>
+          <label class="toggle"><input id="useWebSearchChat" type="checkbox" checked /> Enriquecer con búsqueda web</label>
+          <label class="toggle"><input id="useWebKnowledgeChat" type="checkbox" checked /> Usar memoria web reciente</label>
+          <input id="webQueryChat" placeholder="Query web (opcional)" />
+          <input id="webResultsLimitChat" type="number" min="1" max="10" value="3" />
+        </section>
+      </section>
+
+      <section class="tab-pane" data-pane="archivos">
+        <section class="block">
+          <h2>Gestor de Archivos</h2>
+          <p class="muted small">Interfaz OneDrive-like para tu workspace</p>
+          <div id="fileBrowser" style="border: 1px solid #444; padding: 10px; border-radius: 4px; max-height: 400px; overflow-y: auto; margin: 10px 0;">
+            <p id="fileListStatus" class="muted small">Conectando...</p>
+            <div id="fileList"></div>
+          </div>
+          <input id="searchFiles" placeholder="Buscar archivos..." />
+          <button id="btnSearchFiles">Buscar</button>
+          <button id="btnNewFolder">Nueva carpeta</button>
         </section>
       </section>
 
@@ -152,9 +186,19 @@
 
     <section class="panel chat">
       <div class="status-strip" id="statusStrip">Listo para iniciar sesion.</div>
+      <div style="display: flex; gap: 10px; padding: 10px; background: #1a1a1a; border-bottom: 1px solid #333;">
+        <div style="flex: 1;">
+          <small class="muted">Modelo:</small>
+          <select id="modelSelectMain" style="width: 100%;"></select>
+        </div>
+        <div id="progressIndicator" style="flex: 0.3; display: flex; align-items: center; justify-content: center; gap: 5px;">
+          <div id="spinner" style="display: none; width: 16px; height: 16px; border: 2px solid #666; border-top: 2px solid #00d4ff; border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
+          <small id="progressText" class="muted">Listo</small>
+        </div>
+      </div>
       <div id="log" class="log"></div>
       <div class="composer">
-        <textarea id="prompt" placeholder="Escribe algo... ejemplo: crea archivo notes/hola.txt con contenido 'hola mundo'"></textarea>
+        <textarea id="prompt" placeholder="Escribe tu pregunta o comando... (usa /help para ver comandos)"></textarea>
         <button id="btnSend">Enviar</button>
       </div>
     </section>

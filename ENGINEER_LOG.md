@@ -1,5 +1,32 @@
 # Engineer Log
 
+## [CP-10] 2026-03-30  
+Status: Passed
+Decisions made:
+- Implemented lightweight `ChatQualityChecker` with heuristic scoring (0.0-1.0) for response coherence without requiring extra LLM calls.
+- Added new `/api/chat/quality` endpoint that applies quality validation and exposes score in `tool_events`.
+- Implemented `FileManager` class as reusable service for secure file operations (list/preview/copy/move/delete/search) with path traversal protection.
+- Added 8 new file manager endpoints (`/api/files/manager/*`) accessible behind "files" permission.
+- Restructured web UI with new tabs "Chat IA" and "Archivos" in sidebar for better UX organization.
+- Improved chat panel with visible model selector, real-time progress spinner and better visual feedback.
+- Added CSS animations for spinner and file browser styling.
+
+Trade-offs:
+- Chat Quality Checker uses heuristics only (no external classifier or language model) to keep latency <100ms and cost zero.
+- File preview limited to 50KB and specific file types (.txt, .md, .py, .json, .csv, etc.) to avoid accidental binary exposure.
+- Real-time progress shown via UI state toggle rather than SSE streaming (deferred to v1.0) to reduce complexity.
+
+Debt deferred:
+- Implement true streaming with Server-Sent Events (SSE) for step-by-step progress feedback.
+- Add citation ranking by relevance score and freshness timestamp in file manager and web results.
+- Add telemetry/profiling for file manager operations (throughput, latency percentiles).
+- Add support for cloud storage backends (S3, Azure Blob, etc.) beyond local workspace.
+
+Next steps:
+- Deploy and validate full UI with real users on production LAN.
+- Add optional background indexing for large file repositories.
+- Consider full-text search capability for document content.
+
 ## [CP-09] 2026-03-30
 Status: Passed
 Decisions made:

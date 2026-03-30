@@ -6,7 +6,7 @@
 - **MINOR:** New user-visible features that preserve existing flows (e.g., new backend option, new export format).
 - **PATCH:** Bug fixes, security patches, and non-breaking improvements (e.g., faster load, UI polish).
 
-**Current Version:** `0.8.0` (Web search enrichment release)
+**Current Version:** `0.9.0` (UX Overhaul & Chat Quality release)
 
 ## Distribution & Releases
 

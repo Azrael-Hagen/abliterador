@@ -16,7 +16,9 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from abliterador_web.auth import AuthUser, TokenAuth
+from abliterador_web.chat_quality import ChatQualityChecker
 from abliterador_web.config import WebSettings, load_settings
+from abliterador_web.file_manager import FileManager
 from abliterador_web.models import (
     ChatRequest,
     ChatResponse,
@@ -259,11 +261,12 @@ def create_app() -> FastAPI:
         settings.web_knowledge_path,
         max_queries=settings.web_knowledge_max_queries,
     )
+    chat_quality_checker = ChatQualityChecker()
     rate_limiter = SlidingWindowRateLimiter(settings.rate_limit_per_minute, 60)
     server_urls = [item.url for item in detect_server_addresses(settings.port)]
     ftp_access_urls = ftp_urls(settings.ftp_port) if settings.ftp_enabled else []
 
-    app = FastAPI(title="Abliterador Web Server", version="0.8.0")
+    app = FastAPI(title="Abliterador Web Server", version="0.9.0")
     module_dir = Path(__file__).resolve().parent
     templates = Jinja2Templates(directory=str(module_dir / "templates"))
     app.mount("/static", StaticFiles(directory=str(module_dir / "static")), name="static")
@@ -291,6 +294,9 @@ def create_app() -> FastAPI:
 
     def user_sandbox(user: AuthUser) -> FileSandbox:
         return FileSandbox([user_workspace(user.username)])
+
+    def user_file_manager(user: AuthUser) -> FileManager:
+        return FileManager(user_workspace(user.username))
 
     def _to_profile_response(item) -> UserProfileResponse:
         return UserProfileResponse(
@@ -635,6 +641,240 @@ def create_app() -> FastAPI:
             return {"deleted": deleted}
         except SandboxError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    # ===== File Manager Endpoints (OneDrive-like interface) =====
+
+    @app.post("/api/files/manager/list")
+    async def files_manager_list(
+        payload: dict,
+        user: AuthUser = Depends(require_permission("files")),
+    ):
+        """List files with metadata (size, date, type)."""
+        fm = user_file_manager(user)
+        try:
+            path = payload.get("path", "")
+            filter_type = payload.get("filter_type")
+            files = fm.list_files(path, filter_type)
+            return {
+                "files": [
+                    {
+                        "path": f.path,
+                        "name": f.name,
+                        "size_bytes": f.size_bytes,
+                        "size_readable": f.readable_size,
+                        "modified_at": f.modified_at,
+                        "is_dir": f.is_dir,
+                        "type": f.file_type,
+                    }
+                    for f in files
+                ]
+            }
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.post("/api/files/manager/info")
+    async def files_manager_info(
+        payload: dict,
+        user: AuthUser = Depends(require_permission("files")),
+    ):
+        """Get metadata for single file."""
+        fm = user_file_manager(user)
+        try:
+            f = fm.get_file_info(payload.get("path"))
+            return {
+                "path": f.path,
+                "name": f.name,
+                "size_bytes": f.size_bytes,
+                "size_readable": f.readable_size,
+                "modified_at": f.modified_at,
+                "is_dir": f.is_dir,
+                "type": f.file_type,
+            }
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.post("/api/files/manager/preview")
+    async def files_manager_preview(
+        payload: dict,
+        user: AuthUser = Depends(require_permission("files")),
+    ):
+        """Get text preview of file."""
+        fm = user_file_manager(user)
+        try:
+            return fm.get_preview(payload.get("path"), max_lines=50)
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.post("/api/files/manager/copy")
+    async def files_manager_copy(
+        payload: dict,
+        user: AuthUser = Depends(require_permission("files")),
+    ):
+        """Copy file from src to dst."""
+        fm = user_file_manager(user)
+        try:
+            new_path = fm.copy_file(payload.get("src"), payload.get("dst"))
+            return {"path": new_path}
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.post("/api/files/manager/move")
+    async def files_manager_move(
+        payload: dict,
+        user: AuthUser = Depends(require_permission("files")),
+    ):
+        """Move or rename file."""
+        fm = user_file_manager(user)
+        try:
+            new_path = fm.move_file(payload.get("src"), payload.get("dst"))
+            return {"path": new_path}
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.post("/api/files/manager/delete")
+    async def files_manager_delete(
+        payload: dict,
+        user: AuthUser = Depends(require_permission("files")),
+    ):
+        """Delete file or directory."""
+        fm = user_file_manager(user)
+        try:
+            deleted = fm.delete_file(payload.get("path"))
+            return {"deleted": deleted}
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.post("/api/files/manager/mkdir")
+    async def files_manager_mkdir(
+        payload: dict,
+        user: AuthUser = Depends(require_permission("files")),
+    ):
+        """Create a new folder."""
+        fm = user_file_manager(user)
+        try:
+            path = fm.create_folder(payload.get("path"))
+            return {"path": path}
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.post("/api/files/manager/search")
+    async def files_manager_search(
+        payload: dict,
+        user: AuthUser = Depends(require_permission("files")),
+    ):
+        """Search for files by name."""
+        fm = user_file_manager(user)
+        try:
+            query = payload.get("query", "")
+            limit = payload.get("limit", 100)
+            results = fm.search(query, limit)
+            return {
+                "query": query,
+                "results": [
+                    {
+                        "path": f.path,
+                        "name": f.name,
+                        "size_readable": f.readable_size,
+                        "modified_at": f.modified_at,
+                        "is_dir": f.is_dir,
+                        "type": f.file_type,
+                    }
+                    for f in results
+                ],
+            }
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    # ===== Chat with Quality Checking =====
+
+    @app.post("/api/chat/quality")
+    async def chat_with_quality(
+        payload: ChatRequest,
+        user: AuthUser = Depends(require_permission("chat")),
+    ):
+        """Chat endpoint with built-in quality checking."""
+        sandbox = user_sandbox(user)
+        messages = []
+        tool_events: list[str] = []
+
+        if payload.use_file_tools:
+            messages.append({"role": "system", "content": _tool_system_prompt()})
+
+        web_context_results: list[dict[str, str]] = []
+        if payload.use_web_search:
+            if not settings.web_search_enabled:
+                tool_events.append("web_search deshabilitado")
+            else:
+                query = payload.web_query.strip() or payload.message
+                try:
+                    web_context_results = web_search.search(query, payload.web_results_limit)
+                    web_knowledge.record(query, web_context_results)
+                    tool_events.append(f"web_search: {len(web_context_results)} fuente(s)")
+                except Exception as exc:
+                    tool_events.append(f"web_search error: {exc}")
+
+        if payload.use_recent_web_knowledge and not web_context_results:
+            hint = payload.web_query.strip() or payload.message
+            web_context_results = web_knowledge.recent(hint, payload.web_results_limit)
+            if web_context_results:
+                tool_events.append(f"web_knowledge: {len(web_context_results)} fuente(s)")
+
+        if web_context_results:
+            context = _format_web_context(web_context_results)
+            if context:
+                messages.append({"role": "system", "content": _web_context_system_prompt(context)})
+                for item in web_context_results[: payload.web_results_limit]:
+                    title = str(item.get("title", "Fuente"))
+                    url = str(item.get("url", ""))
+                    if url:
+                        tool_events.append(f"fuente: {title} -> {url}")
+
+        messages.append({"role": "user", "content": payload.message})
+
+        try:
+            reply = ollama.chat(model=payload.model, messages=messages)
+        except Exception as exc:
+            raise HTTPException(status_code=503, detail=f"Error de inferencia: {exc}") from exc
+
+        # Quality check
+        quality_score = chat_quality_checker.check_response(reply, payload.message)
+        tool_events.append(f"quality_score: {quality_score.score:.0%} - {chat_quality_checker.get_quality_summary(quality_score)}")
+        if quality_score.issues:
+            tool_events.extend([f"quality_issue: {issue}" for issue in quality_score.issues])
+
+        if payload.use_file_tools:
+            tool_call = _extract_tool_call(reply)
+            if tool_call:
+                try:
+                    tool_name = str(tool_call.get("tool", ""))
+                    path = str(tool_call.get("path", "")).strip()
+                    content = str(tool_call.get("content", ""))
+                    if tool_name == "write_file":
+                        written = sandbox.write_text(path, content)
+                        result = f"write_file ok: {written}"
+                    elif tool_name == "read_file":
+                        read = sandbox.read_text(path)
+                        result = f"read_file ok:\n{read}"
+                    elif tool_name == "delete_file":
+                        deleted = sandbox.delete_file(path)
+                        result = f"delete_file ok: {deleted}"
+                    elif tool_name == "list_dir":
+                        entries = sandbox.list_dir(path or ".")
+                        result = "list_dir ok:\n" + "\n".join(entries)
+                    else:
+                        result = "tool rechazada"
+
+                    tool_events.append(result)
+                    messages.append({"role": "assistant", "content": reply})
+                    messages.append({"role": "tool", "content": result})
+                    follow_up = ollama.chat(model=payload.model, messages=messages)
+                    return ChatResponse(reply=follow_up, tool_events=tool_events)
+                except SandboxError as exc:
+                    tool_events.append(f"tool rechazada por sandbox: {exc}")
+                except Exception as exc:
+                    tool_events.append(f"tool error: {exc}")
+
+        return ChatResponse(reply=reply, tool_events=tool_events)
 
     @app.get("/api/health")
     async def health():

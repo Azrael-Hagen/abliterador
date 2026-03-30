@@ -120,3 +120,21 @@ Acceptance Criteria:
 - [x] Pruebas unitarias para módulo de búsqueda y memoria de conocimiento en verde.
 Status: [x]
 Notes: Se validó E2E local con login, búsqueda web y chat enriquecido; compilación all-in-one completada.
+
+---
+
+## CP-10: UX Mejorada y Chat Quality Assistant
+Milestone: Interfaz rediseñada con visibilidad de catálogo de modelos, progreso real-time, asistencia de calidad de respuestas y File Manager tipo OneDrive.
+Acceptance Criteria:
+- [x] Pestañas nuevas en sidebar: "Chat IA" y "Archivos" para mejor organización.
+- [x] Panel de chat mejorado con selector de modelo visible y indicador de progreso en tiempo real.
+- [x] Chat Quality Checker integrado para validar coherencia, repetición, patrones sin sentido en respuestas.
+- [x] Nuevo endpoint `/api/chat/quality` que aplica validación y reporta score en tiempo real.
+- [x] File Manager tipo OneDrive con operaciones: listar, previsualizar, copiar, mover, eliminar, crear carpetas.
+- [x] 6 nuevos endpoints de file manager: `/api/files/manager/{list,info,preview,copy,move,delete,mkdir,search}`.
+- [x] UI mejorada para mostrar archivos con metadatos (tamaño, fecha, tipo) y acciones rápidas.
+- [x] Animaciones y indicadores visuales (spinner, colores por rol de mensaje, progreso).
+- [x] 20 tests unitarios nuevos (8 para chat quality, 12 para file manager) en verde.
+- [x] Todos los 38 tests de suite en verde sin regresiones.
+Status: [x]
+Notes: Implementación modular de ChatQualityChecker y FileManager como servicios reutilizables. UI restructurada con tabs en sidebar y mejor organización. Progreso visual mejorado aunque sin streaming real (deferido a v1.0). Performance sin degradación significativa (<100ms para quality check).

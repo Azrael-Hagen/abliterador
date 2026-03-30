@@ -1,6 +1,6 @@
 # Abliterador Studio
 
-**Versión actual:** `v0.8.0` — *2026-03-30* 🚀
+**Versión actual:** `v0.9.0` — *2026-03-30* 🎨
 
 Aplicacion GUI en PySide6 para buscar modelos, cargarlos localmente, aplicar abliteración y probar generacion de texto.
 

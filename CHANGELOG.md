@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.9.0] - 2026-03-30 🎨 UX Overhaul & Chat Quality Release
+### Added
+- **Chat Quality Assistant**: Motor ligero para detectar respuestas sin coherencia, repetidas o sin sentido (heurísticas, sin extra LLM).
+- **Nuevo endpoint `/api/chat/quality`**: Versión de chat que aplica validación automática y reporta score de calidad (0-100%).
+- **File Manager tipo OneDrive**: 6 nuevos endpoints (`list`, `info`, `preview`, `copy`, `move`, `delete`, `mkdir`, `search`) para gestionar archivos del workspace.
+- **UI Rediseñada**:
+  - Pestañas sideb ar: "Chat IA" (selector de modelo visible, opciones avanzadas) y "Archivos" (file browser con metadatos y acciones rápidas).
+  - Indicador de progreso real-time con spinner animado durante generación.
+  - Mejor layout del panel de chat con modelo visible, estado de progreso y acciones claras.
+- **Nuevas pruebas**: 20 tests unitarios para ChatQualityChecker (8 tests) y FileManager (12 tests).
+- **CSS mejorado**: Animaciones, estilos para file browser, mejor contraste y usabilidad.
+- **Opciones de chat avanzadas**: Toggle para verificación de calidad, tools, búsqueda web, memoria web reciente.
+
+### Changed
+- Versionado del proyecto incrementado a 0.9.0.
+- UI del servidor completamente reorganizada en tabs del sidebar para mejor experiencia de usuario.
+- Respuestas de chat ahora incluyen evento `tool_events` con score de calidad si está habilitado.
+- Panel derecho de chat mejorado con selector de modelo en la cabecera y progreso visible.
+
+### Fixed
+- Mejor manejo visual de estados durante generación (progreso, errores, completación).
+- Protección contra path traversal en todas las operaciones de file manager.
+- Validación más estricta en ChatQualityChecker para detectar patrones sin sentido.
+
+### Deferred (v1.0+)
+- Streaming real-time con SSE en lugar de polling.
+- Ranking de resultados de búsqueda por relevancia/confianza.
+- Estadísticas detalladas de performance en file manager (latencia, throughput).
+- Integración de proveedores de search premium (Bing, Serper).
+
 ## [0.8.0] - 2026-03-30 🚀 Web Search Enrichment Release
 ### Added
 - Búsqueda por internet desde el servidor con endpoint dedicado (`/api/web/search`) accesible desde la UI web.
