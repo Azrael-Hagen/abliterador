@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased]
+### Added
+- `RELEASE_REQUIREMENTS_V1.md` con criterios de publicacion v1.0.0 y diseno de bootstrap inteligente para autoinstalacion de recursos.
+- `RELEASE_AUDIT.md` con evidencia de auditoria de recursos y smoke E2E de endpoints criticos.
+
+### Changed
+- `.gitignore` actualizado para excluir temporales de build (`.pyi_work/`) y ejecutables locales de `release/`.
+
 ## [0.10.0] - 2026-03-30 🎨 UX Unificada Web Release
 ### Added
 - **Modelo global unificado en UI web**: selección única aplicada a todo el flujo de chat y paneles.

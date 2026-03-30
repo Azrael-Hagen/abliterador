@@ -16,6 +16,8 @@ abliterador_users.json
 # Build artifacts from PyInstaller / setup.py
 build/
 dist/
+.pyi_work/
+release/*.exe
 *.egg-info/
 *.egg
 *.whl
