@@ -23,5 +23,10 @@ heretic-llm==0.1.2
 python-dotenv==1.0.1
 pydantic==2.8.2
 
+# Web server mode (multi-user remote access)
+fastapi==0.115.0
+uvicorn==0.30.6
+jinja2==3.1.4
+
 # Build & Packaging (dev only, not needed in production)
 # PyInstaller==6.10.0 (install separately with `pip install -e .[dev]`)

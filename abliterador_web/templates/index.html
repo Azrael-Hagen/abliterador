@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{ app_name }}</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div class="bg-grid"></div>
+  <main class="layout">
+    <aside class="panel side">
+      <h1>{{ app_name }}</h1>
+      <p class="muted">Servidor remoto multiusuario</p>
+
+      <section class="block">
+        <h2>Login</h2>
+        <input id="username" placeholder="Usuario" value="admin" />
+        <input id="password" type="password" placeholder="Password" />
+        <button id="btnLogin">Conectar</button>
+        <p id="profileInfo" class="muted small"></p>
+      </section>
+
+      <section id="adminBlock" class="block" style="display:none;">
+        <h2>Perfiles (Admin)</h2>
+        <input id="newUser" placeholder="Nuevo usuario" />
+        <input id="newPass" type="password" placeholder="Password inicial" />
+        <select id="newRole">
+          <option value="user">user</option>
+          <option value="admin">admin</option>
+        </select>
+        <button id="btnCreateUser">Crear perfil</button>
+      </section>
+
+      <section class="block">
+        <h2>Modelo</h2>
+        <select id="modelSelect"></select>
+        <button id="btnModels">Refrescar modelos</button>
+      </section>
+
+      <section class="block">
+        <h2>Acceso LAN</h2>
+        <p class="muted small">URLs detectadas:</p>
+        <ul id="serverUrls">
+          {% for item in server_urls %}
+          <li>{{ item }}</li>
+          {% endfor %}
+        </ul>
+      </section>
+
+      <section class="block">
+        <h2>Sandbox</h2>
+        <p class="muted small">Directorios permitidos:</p>
+        <ul>
+          {% for item in allowed_dirs %}
+          <li>{{ item }}</li>
+          {% endfor %}
+        </ul>
+        <label class="toggle"><input id="useTools" type="checkbox" /> Permitir file tools por IA</label>
+      </section>
+    </aside>
+
+    <section class="panel chat">
+      <div id="log" class="log"></div>
+      <div class="composer">
+        <textarea id="prompt" placeholder="Escribe algo... ejemplo: crea archivo notes/hola.txt con contenido 'hola mundo'"></textarea>
+        <button id="btnSend">Enviar</button>
+      </div>
+    </section>
+  </main>
+  <script src="/static/app.js"></script>
+</body>
+</html>

@@ -88,6 +88,94 @@ python build_installer.py
 ## Ejecutar
 python abliterador_studio.py
 
+## Modo Servidor Web (remoto y multiusuario)
+
+Este proyecto ahora incluye un modo web para acceso remoto desde navegador, con autenticacion y sandbox de archivos.
+
+Instalar dependencias:
+
+```bash
+pip install -r requirements.txt
+```
+
+Configurar variables de entorno recomendadas antes de arrancar:
+
+```bash
+# Credenciales del panel web
+set ABLITERADOR_WEB_USER=admin
+set ABLITERADOR_WEB_PASSWORD=tu_password_fuerte
+set ABLITERADOR_WEB_SECRET=tu_secret_largo_y_aleatorio
+
+# Solo red local (1 = habilitado, recomendado)
+set ABLITERADOR_LOCAL_NETWORK_ONLY=1
+
+# Host/puerto del servidor
+set ABLITERADOR_WEB_HOST=0.0.0.0
+set ABLITERADOR_WEB_PORT=8088
+
+# Rendimiento y anti-flood
+set ABLITERADOR_MODELS_CACHE_TTL_S=20
+set ABLITERADOR_RATE_LIMIT_PER_MINUTE=120
+
+# Ollama remoto/local (OpenAI-compatible endpoint de Ollama)
+set ABLITERADOR_OLLAMA_URL=http://127.0.0.1:11434
+
+# Base de perfiles y espacios de usuario
+set ABLITERADOR_USERS_DB=C:\\data\\abliterador_users.json
+set ABLITERADOR_USER_WORKSPACES_ROOT=C:\\data\\abliterador_workspaces
+
+# Opcional: sandbox legacy compartido (no recomendado para multiusuario)
+set ABLITERADOR_ALLOWED_DIRS=C:\\data\\ia_sandbox
+```
+
+Iniciar servidor:
+
+```bash
+python abliterador_web_server.py
+```
+
+Iniciar launcher all-in-one (muestra IPs LAN en consola):
+
+```bash
+python abliterador_all_in_one.py
+```
+
+En Windows Server puedes instalar arranque automatico como servicio/tarea:
+
+```powershell
+# Compilar onefile all-in-one
+python build_installer.py --onefile --all-in-one
+
+# Ejecutar como Administrador (instala servicio NSSM o tarea ONSTART)
+powershell -ExecutionPolicy Bypass -File .\setup_windows_server_service.ps1 -Action install -Port 8088
+```
+
+Eliminar servicio/tarea:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\setup_windows_server_service.ps1 -Action remove
+```
+
+Abrir en navegador:
+
+```text
+http://<ip-del-servidor>:8088
+```
+
+La UI también muestra las URLs LAN detectadas en la sección "Acceso LAN".
+
+Notas de seguridad para produccion:
+- Usa password fuerte y secret unico.
+- Publica el servicio detras de Nginx/Caddy con HTTPS.
+- Mantén `ABLITERADOR_LOCAL_NETWORK_ONLY=1` para bloquear IPs fuera de LAN.
+- Cada usuario tiene su carpeta propia dentro de `ABLITERADOR_USER_WORKSPACES_ROOT`.
+- El sandbox bloquea paths absolutos y traversal (`../`) por usuario.
+
+Perfiles LAN:
+- El usuario admin inicial se crea con `ABLITERADOR_WEB_USER` + `ABLITERADOR_WEB_PASSWORD`.
+- Desde la UI (bloque admin) puedes crear usuarios `user` o `admin`.
+- Cada perfil nuevo recibe su workspace aislado automáticamente.
+
 ## Launcher (Windows)
 - Doble clic en launch_abliterador_studio.bat
 - O desde terminal: launch_abliterador_studio.bat

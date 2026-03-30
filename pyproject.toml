@@ -9,7 +9,7 @@ description = "GUI application for local LLM model loading, abliteration, and te
 readme = "README.md"
 license = {text = "MIT"}
 authors = [
-    {name = "Azrael", email = ""},
+    {name = "Azrael", email = "devnull@example.com"},
 ]
 requires-python = ">=3.10"
 keywords = ["LLM", "abliteration", "transformers", "heretic", "GUI", "Qt", "PySide6"]
@@ -38,6 +38,9 @@ dependencies = [
     "heretic-llm>=0.1.0",
     "python-dotenv>=1.0.0",
     "pydantic>=2.0.0",
+    "fastapi>=0.115.0",
+    "uvicorn>=0.30.0",
+    "jinja2>=3.1.0",
 ]
 
 [project.optional-dependencies]
@@ -58,9 +61,14 @@ Repository = "https://github.com/Azrael-Hagen/abliterador"
 [project.scripts]
 # After installation, users can run: abliterador-studio from command line
 abliterador-studio = "abliterador_studio:main"
+abliterador-web = "abliterador_web.server:main"
+abliterador-all-in-one = "abliterador_all_in_one:main"
 
 [tool.setuptools]
-packages = ["abliterador_app", "abliterador_app.domain", "abliterador_app.services", "abliterador_app.ui"]
+packages = ["abliterador_app", "abliterador_app.domain", "abliterador_app.services", "abliterador_app.ui", "abliterador_web"]
+
+[tool.setuptools.package-data]
+abliterador_web = ["templates/*.html", "static/*.css", "static/*.js"]
 
 [tool.black]
 line-length = 88

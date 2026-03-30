@@ -31,6 +31,7 @@ setup(
     include_package_data=True,
     package_data={
         "abliterador_app": [],
+        "abliterador_web": ["templates/*.html", "static/*.css", "static/*.js"],
     },
     
     # Minimum Python version
@@ -48,6 +49,9 @@ setup(
         "heretic-llm>=0.1.0",
         "python-dotenv>=1.0.0",
         "pydantic>=2.0.0",
+        "fastapi>=0.115.0",
+        "uvicorn>=0.30.0",
+        "jinja2>=3.1.0",
     ],
     
     # Optional dependencies for development/building
@@ -65,6 +69,8 @@ setup(
     entry_points={
         "console_scripts": [
             "abliterador-studio=abliterador_studio:main",
+            "abliterador-web=abliterador_web.server:main",
+            "abliterador-all-in-one=abliterador_all_in_one:main",
         ],
         "gui_scripts": [
             "abliterador-studio-gui=abliterador_studio:main",

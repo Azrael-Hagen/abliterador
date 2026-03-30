@@ -1,5 +1,32 @@
 # Engineer Log
 
+## [CP-06] 2026-03-29
+Status: Passed
+Decisions made:
+- Added isolated web mode (`abliterador_web/`) without modifying existing GUI behavior.
+- Selected FastAPI + Uvicorn for remote multi-user service and browser UI.
+- Implemented token auth with HMAC signed tokens and configurable credentials via environment variables.
+- Implemented file sandbox with strict path normalization and root confinement.
+- Added model tool-calling pattern (JSON tool response) with explicit server-side validation before file operations.
+- Added persistent LAN profiles with role (`admin`/`user`) in `abliterador_users.json` using PBKDF2 password hashing.
+- Added per-user workspace isolation under `web_workspace/users/<username>`.
+- Added local-network-only guard (private/loopback/link-local IPs) configurable via env.
+
+Trade-offs:
+- Kept auth lightweight (single admin credential) for MVP speed; RBAC deferred.
+- Chose in-memory sessionless API model (token-only) for simpler deployment.
+- Tool-calling follows explicit JSON convention instead of full function-calling framework.
+
+Debt deferred:
+- Add RBAC (admin/user roles) and per-user workspaces.
+- Add audit trail persistence for file operations.
+- Add reverse-proxy hardening templates (Nginx/Caddy) and TLS automation.
+
+Next steps:
+- Deploy behind HTTPS reverse proxy on server machine.
+- Rotate credentials/secret from environment and disable defaults.
+- Add integration tests for `/api/chat` with mocked Ollama.
+
 ## [CP-04/Distribution] 2026-03-28
 Status: Passed
 Decisions made:

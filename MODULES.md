@@ -46,6 +46,30 @@
 - Purpose: Classify runtime errors and map them to user-facing guidance + automatic recovery decisions.
 - Public API: classify_runtime_error(), humanize_runtime_error(), suggest_next_action().
 
+12. WebSettings
+- Purpose: Carga declarativa de configuración para modo servidor web (host, puerto, auth, sandbox).
+- Public API: load_settings().
+
+13. TokenAuth
+- Purpose: Emisión/verificación de token firmado HMAC para API multiusuario.
+- Public API: issue_token(), verify_token().
+
+14. FileSandbox
+- Purpose: Operaciones de archivos con restricción estricta a directorios permitidos.
+- Public API: list_dir(), read_text(), write_text(), delete_file().
+
+15. OllamaClient
+- Purpose: Cliente HTTP aislado para listar modelos y generar chat contra servidor Ollama.
+- Public API: list_models(), chat().
+
+16. FastAPI web app
+- Purpose: Exponer chat remoto, auth y herramientas de archivo desde navegador.
+- Public API: create_app(), endpoints `/api/*`.
+
+17. UserStore
+- Purpose: Persistencia de perfiles LAN con hash de password y roles.
+- Public API: ensure_admin(), create_user(), list_users(), verify_credentials().
+
 ## Reuse Rules
 - Any new long-running operation must be routed through ModelTaskWorker.
 - Any new generation controls must be added to GenerationSettings first.

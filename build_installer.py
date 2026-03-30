@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""
+r"""
 Build script for Abliterador Studio using PyInstaller.
 
 This script generates standalone executables for Windows, macOS, and Linux.
@@ -24,10 +24,17 @@ import sys
 import shutil
 import argparse
 import subprocess
+import importlib.util
 from pathlib import Path
 
 
-def get_pyinstaller_args(one_file: bool = False, target_os: str = None) -> list:
+def get_pyinstaller_args(
+    one_file: bool = False,
+    target_os: str = None,
+    app_name: str = "AbliteradorStudio",
+    entrypoint: str = "abliterador_studio.py",
+    console: bool = False,
+) -> list:
     """
     Generate PyInstaller command-line arguments.
     
@@ -39,10 +46,12 @@ def get_pyinstaller_args(one_file: bool = False, target_os: str = None) -> list:
         List of arguments for PyInstaller
     """
     args = [
-        "pyinstaller",
-        "--name=AbliteradorStudio",
+        sys.executable,
+        "-m",
+        "PyInstaller",
+        f"--name={app_name}",
         "--onedir" if not one_file else "--onefile",
-        "--windowed",  # No console window (GUI only)
+        "--windowed" if not console else "--console",
         "--clean",     # Clean build directory before building
         "--noconfirm", # Don't ask for confirmation
         "--icon=abliterador_app/ui/icon.ico" if Path("abliterador_app/ui/icon.ico").exists() else None,
@@ -64,10 +73,14 @@ def get_pyinstaller_args(one_file: bool = False, target_os: str = None) -> list:
         "PySide6",
     ]
     for imp in hidden_imports:
-        args.append(f"--hidden-import={imp}")
+        if importlib.util.find_spec(imp) is not None:
+            args.append(f"--hidden-import={imp}")
+
+    # Include web assets for packaged FastAPI frontend
+    args.append("--collect-data=abliterador_web")
     
     # Entrypoint
-    args.append("abliterador_studio.py")
+    args.append(entrypoint)
     
     return args
 
@@ -80,15 +93,21 @@ def clean_build_artifacts():
         if "*" in pattern:
             for item in Path(".").glob(pattern):
                 if item.is_dir():
-                    print(f"[*] Removing {item}...")
+                    print(f"[>>] Removing {item}...")
                     shutil.rmtree(item, ignore_errors=True)
         else:
             if Path(pattern).exists():
-                print(f"[*] Removing {pattern}...")
+                print(f"[>>] Removing {pattern}...")
                 shutil.rmtree(pattern, ignore_errors=True)
 
 
-def build_executable(one_file: bool = False, target_os: str = None):
+def build_executable(
+    one_file: bool = False,
+    target_os: str = None,
+    app_name: str = "AbliteradorStudio",
+    entrypoint: str = "abliterador_studio.py",
+    console: bool = False,
+):
     """
     Build standalone executable with PyInstaller.
     
@@ -101,30 +120,36 @@ def build_executable(one_file: bool = False, target_os: str = None):
     print(f"{'='*70}\n")
     
     # Verify entrypoint exists
-    if not Path("abliterador_studio.py").exists():
-        print("ERROR: abliterador_studio.py not found in current directory.")
+    if not Path(entrypoint).exists():
+        print(f"ERROR: {entrypoint} not found in current directory.")
         sys.exit(1)
     
-    print("[✓] Entrypoint found: abliterador_studio.py")
+    print(f"[OK] Entrypoint found: {entrypoint}")
     
     # Check PyInstaller is installed
     try:
         import PyInstaller
-        print(f"[✓] PyInstaller {PyInstaller.__version__} installed")
+        print(f"[OK] PyInstaller {PyInstaller.__version__} installed")
     except ImportError:
         print("ERROR: PyInstaller not installed. Run: pip install PyInstaller")
         sys.exit(1)
     
     # Clean previous builds
-    print("\n[*] Cleaning previous build artifacts...")
+    print("\n[>>] Cleaning previous build artifacts...")
     clean_build_artifacts()
     
     # Get PyInstaller args
-    print("\n[*] Generating PyInstaller arguments...")
-    args = get_pyinstaller_args(one_file=one_file, target_os=target_os)
+    print("\n[>>] Generating PyInstaller arguments...")
+    args = get_pyinstaller_args(
+        one_file=one_file,
+        target_os=target_os,
+        app_name=app_name,
+        entrypoint=entrypoint,
+        console=console,
+    )
     
     # Build
-    print("\n[*] Building executable (this may take 2-5 minutes)...")
+    print("\n[>>] Building executable (this may take 2-5 minutes)...")
     print(f"    Command: {' '.join(args)}\n")
     
     result = subprocess.run(args, check=False)
@@ -135,25 +160,25 @@ def build_executable(one_file: bool = False, target_os: str = None):
     
     # Summary
     print(f"\n{'='*70}")
-    print("[✓] Build successful!")
+    print("[OK] Build successful!")
     print(f"{'='*70}\n")
     
     if one_file:
-        exe_name = "AbliteradorStudio.exe" if sys.platform == "win32" else "AbliteradorStudio"
+        exe_name = f"{app_name}.exe" if sys.platform == "win32" else app_name
         exe_path = Path("dist") / exe_name
-        print(f"✓ Executable: {exe_path}")
-        print(f"  Size: {exe_path.stat().st_size / (1024**2):.1f} MB")
-        print(f"  Run: ./{exe_path}")
+        print(f"[+] Executable: {exe_path}")
+        print(f"    Size: {exe_path.stat().st_size / (1024**2):.1f} MB")
+        print(f"    Run: ./{exe_path}")
     else:
-        bundle_path = Path("dist/AbliteradorStudio")
-        print(f"✓ Bundle directory: {bundle_path}")
-        exe = bundle_path / ("AbliteradorStudio.exe" if sys.platform == "win32" else "AbliteradorStudio")
+        bundle_path = Path("dist") / app_name
+        print(f"[+] Bundle directory: {bundle_path}")
+        exe = bundle_path / (f"{app_name}.exe" if sys.platform == "win32" else app_name)
         if exe.exists():
             print(f"  Executable: {exe}")
-        print(f"  Run: ./{bundle_path / ('AbliteradorStudio.exe' if sys.platform == 'win32' else 'AbliteradorStudio')}")
+        print(f"  Run: ./{bundle_path / (f'{app_name}.exe' if sys.platform == 'win32' else app_name)}")
     
-    print("\n[*] You can now distribute this executable or folder to other systems.")
-    print("    No Python installation required on target systems.\n")
+    print("\n[>>] You can now distribute this executable or folder to other systems.")
+    print("     No Python installation required on target systems.\n")
 
 
 def main():
@@ -189,13 +214,18 @@ Examples:
         action="store_true",
         help="Clean build artifacts and exit (don't build)",
     )
+    parser.add_argument(
+        "--all-in-one",
+        action="store_true",
+        help="Build AbliteradorAllInOne server executable (console + LAN IP visible).",
+    )
     
     args = parser.parse_args()
     
     if args.clean:
-        print("[*] Cleaning build artifacts...")
+        print("[>>] Cleaning build artifacts...")
         clean_build_artifacts()
-        print("[✓] Clean complete.\n")
+        print("[OK] Clean complete.\n")
         return
     
     target_os = None
@@ -204,7 +234,21 @@ Examples:
     elif args.linux:
         target_os = "linux"
     
-    build_executable(one_file=args.onefile, target_os=target_os)
+    app_name = "AbliteradorStudio"
+    entrypoint = "abliterador_studio.py"
+    console = False
+    if args.all_in_one:
+        app_name = "AbliteradorAllInOne"
+        entrypoint = "abliterador_all_in_one.py"
+        console = True
+
+    build_executable(
+        one_file=args.onefile,
+        target_os=target_os,
+        app_name=app_name,
+        entrypoint=entrypoint,
+        console=console,
+    )
 
 
 if __name__ == "__main__":

@@ -64,3 +64,18 @@ Acceptance Criteria:
 - [x] CHANGELOG and README updated with run instructions.
 Status: [x]
 Notes: Se añadieron reintentos resilientes para HF (locks/permisos/red), verificación de integridad post-descarga, recuperación visible de micro IA en UI y fallback para estrategia de memoria Heretic (disk offload). Versión v0.3.1 publicada con tag git y push. Checklist E2E documentado en README.
+
+---
+
+## CP-06: Web Server Multiusuario
+Milestone: Acceso remoto por navegador con chat y sandbox de archivos.
+Acceptance Criteria:
+- [x] Servidor FastAPI levanta y sirve UI web.
+- [x] Autenticación por token requerida para API.
+- [x] Chat remoto integrado a Ollama (`/api/chat`).
+- [x] Perfiles LAN persistentes con roles (`admin`/`user`).
+- [x] Espacio propio por usuario en servidor (`web_workspace/users/<usuario>`).
+- [x] Operaciones de archivos limitadas al espacio de cada usuario.
+- [x] Bloqueo de path traversal y rutas absolutas validado con pruebas.
+Status: [x]
+Notes: Se añadió modo web en `abliterador_web/` y entrypoint `abliterador_web_server.py` sin alterar el flujo GUI existente. Se activó guard para red local y gestión de perfiles desde UI admin.

@@ -33,8 +33,12 @@ pip install -e ".[dev]"
 # 4. Compila ejecutable
 python build_installer.py --onefile
 
+# 4b. Compila ejecutable servidor all-in-one (IP visible en consola)
+python build_installer.py --onefile --all-in-one
+
 # 5. Resultado
 # → Busca: dist\AbliteradorStudio.exe (~400MB)
+# → Busca también: dist\AbliteradorAllInOne.exe (servidor web LAN)
 
 # 6. Crea ZIP para distribución
 # Manualmente: Click derecho → Enviar a → Carpeta comprimida
@@ -52,6 +56,14 @@ Remove-Item .venv_build -Recurse -Force
 cd AbliteradorStudio
 .\AbliteradorStudio.exe
 # → Debería abrir GUI sin errores
+
+# O prueba servidor all-in-one:
+.\AbliteradorAllInOne.exe
+# → Debe mostrar IPs LAN y dejar acceso por navegador
+
+# 8. (Opcional Windows Server) Instala arranque automatico
+powershell -ExecutionPolicy Bypass -File .\setup_windows_server_service.ps1 -Action install -Port 8088
+# → Instala servicio (NSSM) o tarea programada ONSTART
 ```
 
 ---
