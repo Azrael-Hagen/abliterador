@@ -12,6 +12,11 @@ export const state = {
   perfMode: localStorage.getItem("abliterador.perfMode") || "balanced",
   isGenerating: false,
   chatAbortController: null,
+  chatTimeoutByPerf: {
+    eco: 120,
+    balanced: 90,
+    fast: 60,
+  },
 };
 
 export const PERF = {
@@ -26,6 +31,7 @@ export const el = {
   spinner: $("spinner"),
   progressText: $("progressText"),
   connBadge: $("connBadge"),
+  chatPerfBadge: $("chatPerfBadge"),
   chatEmptyState: $("chatEmptyState"),
   chatModelBadge: $("chatModelBadge"),
   activeModelBadge: $("activeModelBadge"),
@@ -96,7 +102,7 @@ export const el = {
   panes: Array.from(document.querySelectorAll(".tab-pane")),
 };
 
-export function addMsg(role, text, meta = "") {
+export function createMsg(role, text = "", meta = "") {
   if (!el.log) return;
   if (el.chatEmptyState) {
     el.chatEmptyState.style.display = "none";
@@ -106,6 +112,11 @@ export function addMsg(role, text, meta = "") {
   div.textContent = meta ? `${meta}\n${text}` : text;
   el.log.appendChild(div);
   el.log.scrollTop = el.log.scrollHeight;
+  return div;
+}
+
+export function addMsg(role, text, meta = "") {
+  createMsg(role, text, meta);
 }
 
 export function setStatus(text) {

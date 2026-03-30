@@ -1,5 +1,26 @@
 # Engineer Log
 
+## [CP-12] 2026-03-30
+Status: Passed
+Decisions made:
+- Se consolidó la lógica duplicada de chat en un pipeline único (`_run_chat_pipeline`) para `/api/chat` y `/api/chat/quality`.
+- Se añadió endpoint de streaming NDJSON (`/api/chat/stream`) para respuesta token a token y feedback inmediato en UI.
+- Se movieron operaciones bloqueantes de red a threadpool (`run_in_threadpool`) para evitar bloqueo del event loop de FastAPI.
+- Se estableció timeout de chat por request con cancelación automática del cliente según modo de rendimiento.
+- Se dejó `quality_auto_repair` en `False` por defecto para evitar latencia extra de doble inferencia.
+
+Trade-offs:
+- Streaming se limita a flujo sin file-tools para mantener simplicidad y evitar bloqueo en operaciones de sandbox durante render incremental.
+- Se mantiene fallback no streaming para compatibilidad de navegadores/clientes sin `ReadableStream`.
+
+Debt deferred:
+- Métricas p95/p99 persistidas por endpoint en logs estructurados.
+- Soporte de tool-calls también en endpoint streaming con ejecución incremental.
+
+Next steps:
+- Añadir test de integración dedicado para `/api/chat/stream` con mock de Ollama.
+- Instrumentar histogramas de latencia y alertas de timeout por modelo.
+
 ## [CP-11] 2026-03-30
 Status: Passed
 Decisions made:

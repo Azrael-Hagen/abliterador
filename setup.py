@@ -16,7 +16,7 @@ long_description = readme_file.read_text(encoding="utf-8") if readme_file.exists
 
 setup(
     name="abliterador-studio",
-    version="0.10.1",
+    version="0.10.2",
     description="GUI application for local LLM model loading, abliteration, and text generation with real-time UI feedback.",
     long_description=long_description,
     long_description_content_type="text/markdown",
@@ -53,6 +53,7 @@ setup(
         "uvicorn>=0.30.0",
         "jinja2>=3.1.0",
         "pyftpdlib>=1.5.9",
+        "python-multipart>=0.0.18",
     ],
     
     # Optional dependencies for development/building

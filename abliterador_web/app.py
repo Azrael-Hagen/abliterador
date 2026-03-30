@@ -11,9 +11,10 @@ from typing import Any
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, Request, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.concurrency import run_in_threadpool
 
 from abliterador_web.auth import AuthUser, TokenAuth
 from abliterador_web.chat_quality import ChatQualityChecker
@@ -280,7 +281,7 @@ def create_app() -> FastAPI:
     server_urls = [item.url for item in detect_server_addresses(settings.port)]
     ftp_access_urls = ftp_urls(settings.ftp_port) if settings.ftp_enabled else []
 
-    app = FastAPI(title="Abliterador Web Server", version="0.10.1")
+    app = FastAPI(title="Abliterador Web Server", version="0.10.2")
     module_dir = Path(__file__).resolve().parent
     repo_root = module_dir.parent
     assets_dir = repo_root / "sources"
@@ -367,6 +368,7 @@ def create_app() -> FastAPI:
                 "ftp_libraries": [str(path) for path in settings.ftp_libraries],
                 "default_admin_user": settings.username,
                 "default_admin_password": settings.password,
+                "app_version": app.version,
             },
         )
 
@@ -569,11 +571,10 @@ def create_app() -> FastAPI:
         web_knowledge.record(payload.query, results)
         return WebSearchResponse(query=payload.query, results=results)
 
-    @app.post("/api/chat", response_model=ChatResponse)
-    async def chat(payload: ChatRequest, user: AuthUser = Depends(require_permission("chat"))):
-        sandbox = user_sandbox(user)
-        messages = []
+    async def _prepare_chat_messages(payload: ChatRequest) -> tuple[list[dict[str, str]], list[str]]:
+        messages: list[dict[str, str]] = []
         tool_events: list[str] = []
+
         if payload.use_file_tools:
             messages.append({"role": "system", "content": _tool_system_prompt()})
 
@@ -584,15 +585,15 @@ def create_app() -> FastAPI:
             else:
                 query = payload.web_query.strip() or payload.message
                 try:
-                    web_context_results = web_search.search(query, payload.web_results_limit)
-                    web_knowledge.record(query, web_context_results)
+                    web_context_results = await run_in_threadpool(web_search.search, query, payload.web_results_limit)
+                    await run_in_threadpool(web_knowledge.record, query, web_context_results)
                     tool_events.append(f"web_search: {len(web_context_results)} fuente(s) para '{query}'")
                 except Exception as exc:
                     tool_events.append(f"web_search error: {exc}")
 
         if payload.use_recent_web_knowledge and not web_context_results:
             hint = payload.web_query.strip() or payload.message
-            web_context_results = web_knowledge.recent(hint, payload.web_results_limit)
+            web_context_results = await run_in_threadpool(web_knowledge.recent, hint, payload.web_results_limit)
             if web_context_results:
                 tool_events.append(f"web_knowledge: {len(web_context_results)} fuente(s) recientes")
 
@@ -607,45 +608,142 @@ def create_app() -> FastAPI:
                         tool_events.append(f"fuente: {title} -> {url}")
 
         messages.append({"role": "user", "content": payload.message})
+        return messages, tool_events
+
+    def _run_file_tool(sandbox: FileSandbox, tool_call: dict[str, Any]) -> str:
+        tool_name = str(tool_call.get("tool", ""))
+        path = str(tool_call.get("path", "")).strip()
+        content = str(tool_call.get("content", ""))
+        if tool_name == "write_file":
+            written = sandbox.write_text(path, content)
+            return f"write_file ok: {written}"
+        if tool_name == "read_file":
+            read = sandbox.read_text(path)
+            return f"read_file ok:\n{read}"
+        if tool_name == "delete_file":
+            deleted = sandbox.delete_file(path)
+            return f"delete_file ok: {deleted}"
+        if tool_name == "list_dir":
+            entries = sandbox.list_dir(path or ".")
+            return "list_dir ok:\n" + "\n".join(entries)
+        return "tool rechazada: herramienta no permitida"
+
+    async def _run_chat_pipeline(payload: ChatRequest, user: AuthUser, use_quality: bool) -> ChatResponse:
+        sandbox = user_sandbox(user)
+        messages, tool_events = await _prepare_chat_messages(payload)
 
         try:
-            reply = ollama.chat(model=payload.model, messages=messages)
+            reply = await run_in_threadpool(ollama.chat, payload.model, messages, payload.chat_timeout_s)
         except Exception as exc:
             raise HTTPException(status_code=503, detail=f"Error de inferencia: {exc}") from exc
+
+        quality_score = None
+        quality_summary = None
+        if use_quality and payload.quality_check_enabled:
+            quality = chat_quality_checker.check_response(reply, payload.message)
+            quality_score = quality.score
+            quality_summary = chat_quality_checker.get_quality_summary(quality)
+            tool_events.append(f"quality_score: {quality.score:.0%} - {quality_summary}")
+            if quality.issues:
+                tool_events.extend([f"quality_issue: {issue}" for issue in quality.issues])
+
+            if payload.quality_auto_repair and not quality.is_acceptable:
+                try:
+                    messages.append({
+                        "role": "system",
+                        "content": (
+                            "Reformula tu respuesta para que sea clara, concreta y coherente con la pregunta. "
+                            "Evita relleno, repeticiones y texto sin sentido."
+                        ),
+                    })
+                    messages.append({"role": "assistant", "content": reply})
+                    repaired = await run_in_threadpool(ollama.chat, payload.model, messages, payload.chat_timeout_s)
+                    repaired_score = chat_quality_checker.check_response(repaired, payload.message)
+                    if repaired_score.score >= quality.score:
+                        reply = repaired
+                        quality_score = repaired_score.score
+                        quality_summary = chat_quality_checker.get_quality_summary(repaired_score)
+                        tool_events.append("quality_autofix: respuesta refinada por mini-ia")
+                except Exception as exc:
+                    tool_events.append(f"quality_autofix_error: {exc}")
 
         if payload.use_file_tools:
             tool_call = _extract_tool_call(reply)
             if tool_call:
                 try:
-                    tool_name = str(tool_call.get("tool", ""))
-                    path = str(tool_call.get("path", "")).strip()
-                    content = str(tool_call.get("content", ""))
-                    if tool_name == "write_file":
-                        written = sandbox.write_text(path, content)
-                        result = f"write_file ok: {written}"
-                    elif tool_name == "read_file":
-                        read = sandbox.read_text(path)
-                        result = f"read_file ok:\n{read}"
-                    elif tool_name == "delete_file":
-                        deleted = sandbox.delete_file(path)
-                        result = f"delete_file ok: {deleted}"
-                    elif tool_name == "list_dir":
-                        entries = sandbox.list_dir(path or ".")
-                        result = "list_dir ok:\n" + "\n".join(entries)
-                    else:
-                        result = "tool rechazada: herramienta no permitida"
-
+                    result = await run_in_threadpool(_run_file_tool, sandbox, tool_call)
                     tool_events.append(result)
                     messages.append({"role": "assistant", "content": reply})
                     messages.append({"role": "tool", "content": result})
-                    follow_up = ollama.chat(model=payload.model, messages=messages)
-                    return ChatResponse(reply=follow_up, tool_events=tool_events, model_used=payload.model)
+                    follow_up = await run_in_threadpool(ollama.chat, payload.model, messages, payload.chat_timeout_s)
+                    return ChatResponse(
+                        reply=follow_up,
+                        tool_events=tool_events,
+                        model_used=payload.model,
+                        quality_score=quality_score,
+                        quality_summary=quality_summary,
+                    )
                 except SandboxError as exc:
                     tool_events.append(f"tool rechazada por sandbox: {exc}")
                 except Exception as exc:
                     tool_events.append(f"tool error: {exc}")
 
-        return ChatResponse(reply=reply, tool_events=tool_events, model_used=payload.model)
+        return ChatResponse(
+            reply=reply,
+            tool_events=tool_events,
+            model_used=payload.model,
+            quality_score=quality_score,
+            quality_summary=quality_summary,
+        )
+
+    @app.post("/api/chat", response_model=ChatResponse)
+    async def chat(payload: ChatRequest, user: AuthUser = Depends(require_permission("chat"))):
+        return await _run_chat_pipeline(payload, user, use_quality=False)
+
+    @app.post("/api/chat/quality", response_model=ChatResponse)
+    async def chat_with_quality(payload: ChatRequest, user: AuthUser = Depends(require_permission("chat"))):
+        return await _run_chat_pipeline(payload, user, use_quality=True)
+
+    @app.post("/api/chat/stream")
+    async def chat_stream(payload: ChatRequest, user: AuthUser = Depends(require_permission("chat"))):
+        if payload.use_file_tools:
+            raise HTTPException(status_code=400, detail="Streaming no disponible con file tools; usa /api/chat/quality")
+
+        messages, tool_events = await _prepare_chat_messages(payload)
+        started = time.perf_counter()
+
+        def event_stream():
+            try:
+                for event in tool_events:
+                    yield json.dumps({"type": "tool", "message": event}, ensure_ascii=False) + "\n"
+
+                chunks: list[str] = []
+                for row in ollama.chat_stream(payload.model, messages, payload.chat_timeout_s):
+                    delta = str(row.get("delta", ""))
+                    if delta:
+                        chunks.append(delta)
+                        yield json.dumps({"type": "token", "delta": delta}, ensure_ascii=False) + "\n"
+
+                reply = "".join(chunks).strip()
+                if payload.quality_check_enabled:
+                    quality = chat_quality_checker.check_response(reply, payload.message)
+                    summary = chat_quality_checker.get_quality_summary(quality)
+                    yield json.dumps(
+                        {"type": "quality", "score": quality.score, "summary": summary},
+                        ensure_ascii=False,
+                    ) + "\n"
+                    for issue in quality.issues:
+                        yield json.dumps({"type": "tool", "message": f"quality_issue: {issue}"}, ensure_ascii=False) + "\n"
+
+                elapsed_ms = int((time.perf_counter() - started) * 1000)
+                yield json.dumps(
+                    {"type": "done", "model_used": payload.model, "elapsed_ms": elapsed_ms},
+                    ensure_ascii=False,
+                ) + "\n"
+            except Exception as exc:
+                yield json.dumps({"type": "error", "message": f"Error de inferencia: {exc}"}, ensure_ascii=False) + "\n"
+
+        return StreamingResponse(event_stream(), media_type="application/x-ndjson")
 
     @app.post("/api/files/list")
     async def files_list(payload: FileListRequest, user: AuthUser = Depends(require_permission("files"))):
@@ -863,131 +961,6 @@ def create_app() -> FastAPI:
             }
         except Exception as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    # ===== Chat with Quality Checking =====
-
-    @app.post("/api/chat/quality", response_model=ChatResponse)
-    async def chat_with_quality(
-        payload: ChatRequest,
-        user: AuthUser = Depends(require_permission("chat")),
-    ):
-        """Chat endpoint with built-in quality checking."""
-        sandbox = user_sandbox(user)
-        messages = []
-        tool_events: list[str] = []
-
-        if payload.use_file_tools:
-            messages.append({"role": "system", "content": _tool_system_prompt()})
-
-        web_context_results: list[dict[str, str]] = []
-        if payload.use_web_search:
-            if not settings.web_search_enabled:
-                tool_events.append("web_search deshabilitado")
-            else:
-                query = payload.web_query.strip() or payload.message
-                try:
-                    web_context_results = web_search.search(query, payload.web_results_limit)
-                    web_knowledge.record(query, web_context_results)
-                    tool_events.append(f"web_search: {len(web_context_results)} fuente(s)")
-                except Exception as exc:
-                    tool_events.append(f"web_search error: {exc}")
-
-        if payload.use_recent_web_knowledge and not web_context_results:
-            hint = payload.web_query.strip() or payload.message
-            web_context_results = web_knowledge.recent(hint, payload.web_results_limit)
-            if web_context_results:
-                tool_events.append(f"web_knowledge: {len(web_context_results)} fuente(s)")
-
-        if web_context_results:
-            context = _format_web_context(web_context_results)
-            if context:
-                messages.append({"role": "system", "content": _web_context_system_prompt(context)})
-                for item in web_context_results[: payload.web_results_limit]:
-                    title = str(item.get("title", "Fuente"))
-                    url = str(item.get("url", ""))
-                    if url:
-                        tool_events.append(f"fuente: {title} -> {url}")
-
-        messages.append({"role": "user", "content": payload.message})
-
-        try:
-            reply = ollama.chat(model=payload.model, messages=messages)
-        except Exception as exc:
-            raise HTTPException(status_code=503, detail=f"Error de inferencia: {exc}") from exc
-
-        # Quality check
-        quality_score = chat_quality_checker.check_response(reply, payload.message)
-        quality_summary = chat_quality_checker.get_quality_summary(quality_score)
-        tool_events.append(f"quality_score: {quality_score.score:.0%} - {quality_summary}")
-        if quality_score.issues:
-            tool_events.extend([f"quality_issue: {issue}" for issue in quality_score.issues])
-
-        # Lightweight guardrail: one repair pass only when quality is low.
-        if not quality_score.is_acceptable:
-            try:
-                messages.append({
-                    "role": "system",
-                    "content": (
-                        "Reformula tu respuesta para que sea clara, concreta y coherente con la pregunta. "
-                        "Evita relleno, repeticiones y texto sin sentido."
-                    ),
-                })
-                messages.append({"role": "assistant", "content": reply})
-                repaired = ollama.chat(model=payload.model, messages=messages)
-                repaired_score = chat_quality_checker.check_response(repaired, payload.message)
-                if repaired_score.score >= quality_score.score:
-                    reply = repaired
-                    quality_score = repaired_score
-                    quality_summary = chat_quality_checker.get_quality_summary(quality_score)
-                    tool_events.append("quality_autofix: respuesta refinada por mini-ia")
-            except Exception as exc:
-                tool_events.append(f"quality_autofix_error: {exc}")
-
-        if payload.use_file_tools:
-            tool_call = _extract_tool_call(reply)
-            if tool_call:
-                try:
-                    tool_name = str(tool_call.get("tool", ""))
-                    path = str(tool_call.get("path", "")).strip()
-                    content = str(tool_call.get("content", ""))
-                    if tool_name == "write_file":
-                        written = sandbox.write_text(path, content)
-                        result = f"write_file ok: {written}"
-                    elif tool_name == "read_file":
-                        read = sandbox.read_text(path)
-                        result = f"read_file ok:\n{read}"
-                    elif tool_name == "delete_file":
-                        deleted = sandbox.delete_file(path)
-                        result = f"delete_file ok: {deleted}"
-                    elif tool_name == "list_dir":
-                        entries = sandbox.list_dir(path or ".")
-                        result = "list_dir ok:\n" + "\n".join(entries)
-                    else:
-                        result = "tool rechazada"
-
-                    tool_events.append(result)
-                    messages.append({"role": "assistant", "content": reply})
-                    messages.append({"role": "tool", "content": result})
-                    follow_up = ollama.chat(model=payload.model, messages=messages)
-                    return ChatResponse(
-                        reply=follow_up,
-                        tool_events=tool_events,
-                        model_used=payload.model,
-                        quality_score=quality_score.score,
-                        quality_summary=quality_summary,
-                    )
-                except SandboxError as exc:
-                    tool_events.append(f"tool rechazada por sandbox: {exc}")
-                except Exception as exc:
-                    tool_events.append(f"tool error: {exc}")
-
-        return ChatResponse(
-            reply=reply,
-            tool_events=tool_events,
-            model_used=payload.model,
-            quality_score=quality_score.score,
-            quality_summary=quality_summary,
-        )
 
     @app.get("/api/health")
     async def health():

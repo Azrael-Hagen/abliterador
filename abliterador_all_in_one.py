@@ -14,7 +14,7 @@ from abliterador_web.config import load_settings
 from abliterador_web.ftp_server import ftp_urls, start_ftp_server, stop_ftp_server
 from abliterador_web.network import detect_server_addresses
 
-APP_VERSION = "0.10.1"
+APP_VERSION = "0.10.2"
 
 
 def main() -> None:

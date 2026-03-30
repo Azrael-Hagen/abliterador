@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "abliterador-studio"
-version = "0.10.1"
+version = "0.10.2"
 description = "GUI application for local LLM model loading, abliteration, and text generation"
 readme = "README.md"
 license = {text = "MIT"}
@@ -42,6 +42,7 @@ dependencies = [
     "uvicorn>=0.30.0",
     "jinja2>=3.1.0",
     "pyftpdlib>=1.5.9",
+    "python-multipart>=0.0.18",
 ]
 
 [project.optional-dependencies]

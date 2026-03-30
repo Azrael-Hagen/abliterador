@@ -189,6 +189,11 @@ button.danger {
   color: #b4d3e4;
 }
 
+#chatPerfBadge {
+  border-color: rgba(89, 215, 184, 0.42);
+  color: #c9f2e7;
+}
+
 .badge-warn {
   border-color: rgba(255, 143, 143, 0.5);
   color: #ffd4d4;

@@ -1,4 +1,4 @@
-# Release Audit v0.10.1
+# Release Audit v0.10.2
 
 Fecha de validacion: 2026-03-30
 Entorno: Windows local (127.0.0.1:8088)
@@ -44,3 +44,10 @@ Entorno: Windows local (127.0.0.1:8088)
 - OK | UI chat | estado vacio informativo y chips de estado visibles
 - OK | UI chat | `Enter` envia y `Shift+Enter` conserva salto de linea
 - OK | UI chat | boton cancelar aborta solicitud en curso sin recargar pagina
+
+## Revalidacion 2026-03-30 (streaming y performance hardening)
+
+- OK | tests | `38 passed` en `.venv`
+- OK | API smoke | `/api/health`, `/api/login`, `/api/models` = 200
+- OK | API streaming | `/api/chat/stream` = 200 con eventos NDJSON token-by-token
+- OK | sample stream | `{"type":"token"...}` recibido en cliente de prueba

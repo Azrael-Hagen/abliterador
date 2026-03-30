@@ -2,6 +2,7 @@ import {
   state,
   el,
   apiRequest,
+  createMsg,
   addMsg,
   setStatus,
   setProgress,
@@ -82,6 +83,116 @@ async function loadDownloadCatalog() {
   renderDownloadCatalog(data.models || [], pullModel);
 }
 
+async function parseErrorResponse(response) {
+  const isJson = (response.headers.get("content-type") || "").includes("application/json");
+  if (!isJson) return `HTTP ${response.status}`;
+  const payload = await response.json().catch(() => ({}));
+  if (typeof payload?.detail === "string") return payload.detail;
+  if (payload?.detail && typeof payload.detail === "object") {
+    if (typeof payload.detail.message === "string") {
+      return payload.detail.hint ? `${payload.detail.message} | ${payload.detail.hint}` : payload.detail.message;
+    }
+    return JSON.stringify(payload.detail);
+  }
+  return payload?.message || `HTTP ${response.status}`;
+}
+
+async function streamChatResponse(payload) {
+  const headers = {
+    "Content-Type": "application/json",
+  };
+  if (state.token) {
+    headers.Authorization = `Bearer ${state.token}`;
+  }
+
+  const startedAt = performance.now();
+  const response = await fetch("/api/chat/stream", {
+    method: "POST",
+    headers,
+    body: JSON.stringify(payload),
+    signal: state.chatAbortController?.signal,
+  });
+
+  if (!response.ok) {
+    throw new Error(await parseErrorResponse(response));
+  }
+
+  const aiMsg = createMsg("ai", "", `Modelo usado: ${payload.model}`);
+  if (!(response.body && aiMsg instanceof HTMLElement)) {
+    const fallbackEndpoint = payload.quality_check_enabled ? "/api/chat/quality" : "/api/chat";
+    const data = await apiRequest(fallbackEndpoint, "POST", payload, false, {
+      signal: state.chatAbortController?.signal,
+    });
+    aiMsg.textContent = data.reply || "(sin respuesta)";
+    return data;
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let reply = "";
+  let modelUsed = payload.model;
+  let qualitySummary = "";
+  let qualityScore = null;
+  let elapsedMs = 0;
+  const toolEvents = [];
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+
+    for (const line of lines) {
+      const raw = line.trim();
+      if (!raw) continue;
+      const event = JSON.parse(raw);
+
+      if (event.type === "token") {
+        reply += event.delta || "";
+        aiMsg.textContent = reply || " ";
+      } else if (event.type === "tool") {
+        const text = String(event.message || "").trim();
+        if (text) {
+          toolEvents.push(text);
+          addMsg("tool", text);
+        }
+      } else if (event.type === "quality") {
+        qualityScore = typeof event.score === "number" ? event.score : null;
+        qualitySummary = String(event.summary || "");
+      } else if (event.type === "done") {
+        modelUsed = event.model_used || modelUsed;
+        elapsedMs = Number(event.elapsed_ms || 0);
+      } else if (event.type === "error") {
+        throw new Error(String(event.message || "Error de streaming"));
+      }
+    }
+  }
+
+  if (!reply.trim()) {
+    aiMsg.textContent = "(sin respuesta)";
+  }
+
+  if (qualitySummary) {
+    addMsg("tool", `Calidad: ${qualitySummary}`);
+  }
+
+  if (el.chatPerfBadge) {
+    const totalMs = elapsedMs || Math.round(performance.now() - startedAt);
+    const qualityLabel = qualityScore === null ? "sin QA" : `${Math.round(qualityScore * 100)}% QA`;
+    el.chatPerfBadge.textContent = `Chat: ${totalMs} ms | ${qualityLabel}`;
+  }
+
+  return {
+    reply,
+    model_used: modelUsed,
+    tool_events: toolEvents,
+    quality_summary: qualitySummary,
+    quality_score: qualityScore,
+  };
+}
+
 async function sendChat() {
   if (state.isGenerating) {
     addMsg("tool", "Ya hay una generacion en curso. Puedes cancelarla.");
@@ -101,7 +212,6 @@ async function sendChat() {
   setProgress(true, "Preparando solicitud...");
   setStatus("Chat: preparando");
 
-  const endpoint = el.useQualityCheck?.checked ? "/api/chat/quality" : "/api/chat";
   const payload = {
     model: state.activeModel,
     message,
@@ -110,10 +220,18 @@ async function sendChat() {
     web_query: (el.webQueryChat?.value || "").trim(),
     web_results_limit: Number(el.webResultsLimitChat?.value || 3),
     use_recent_web_knowledge: Boolean(el.useWebKnowledgeChat?.checked),
+    quality_check_enabled: Boolean(el.useQualityCheck?.checked),
+    chat_timeout_s: state.chatTimeoutByPerf[state.perfMode] || 90,
+    quality_auto_repair: false,
   };
 
   state.isGenerating = true;
   state.chatAbortController = new AbortController();
+  const timeoutHandle = window.setTimeout(() => {
+    if (state.isGenerating && state.chatAbortController) {
+      state.chatAbortController.abort();
+    }
+  }, payload.chat_timeout_s * 1000);
   if (el.btnSend) el.btnSend.disabled = true;
   if (el.btnCancel) el.btnCancel.disabled = false;
 
@@ -122,11 +240,9 @@ async function sendChat() {
       setProgress(true, "Enriqueciendo contexto web...");
     }
 
-    setProgress(true, "Generando respuesta...");
-    const data = await apiRequest(endpoint, "POST", payload, false, {
-      signal: state.chatAbortController?.signal,
-    });
-    setProgress(true, "Validando coherencia...");
+    setProgress(true, "Generando respuesta en streaming...");
+    const data = await streamChatResponse(payload);
+    setProgress(true, "Finalizando respuesta...");
 
     if (Array.isArray(data.tool_events)) {
       data.tool_events.forEach((event) => {
@@ -137,7 +253,6 @@ async function sendChat() {
     }
 
     const modelUsed = data.model_used || state.activeModel;
-    addMsg("ai", data.reply || "(sin respuesta)", `Modelo usado: ${modelUsed}`);
     setActiveModel(modelUsed, true);
     setStatus("Chat listo");
   } catch (err) {
@@ -149,6 +264,7 @@ async function sendChat() {
       setStatus("Error en chat");
     }
   } finally {
+    window.clearTimeout(timeoutHandle);
     state.isGenerating = false;
     state.chatAbortController = null;
     if (el.btnSend) el.btnSend.disabled = false;

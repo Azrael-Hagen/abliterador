@@ -106,6 +106,18 @@
 - Purpose: Estado centralizado de sesión/modelo/rendimiento/archivos para evitar lógica redundante en frontend.
 - Public API: setActiveModel(), loadModels(), loadFileList(), sendChat(), loadDownloadCatalog().
 
+27. Chat Pipeline Unificado Web
+- Purpose: Unificar preparación de contexto, inferencia y post-procesamiento para `/api/chat` y `/api/chat/quality`.
+- Public API: _prepare_chat_messages(), _run_chat_pipeline().
+
+28. NDJSON Chat Streaming Endpoint
+- Purpose: Entregar respuesta token a token y eventos de estado para UX fluida sin polling.
+- Public API: `POST /api/chat/stream` (eventos `token|tool|quality|done|error`).
+
+29. Ollama Streaming Adapter
+- Purpose: Encapsular consumo streaming del endpoint `/api/chat` de Ollama sin acoplar lógica de transporte al controlador.
+- Public API: OllamaClient.chat_stream().
+
 ## Reuse Rules
 - Any new long-running operation must be routed through ModelTaskWorker.
 - Any new generation controls must be added to GenerationSettings first.

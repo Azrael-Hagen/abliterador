@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+## [0.10.2] - 2026-03-30 ⚡ Streaming & Performance Hardening
+### Added
+- Nuevo endpoint `POST /api/chat/stream` con salida NDJSON token a token para feedback inmediato en UI.
+- Timeout de chat configurable por request (`chat_timeout_s`) con cancelacion cliente automatica por modo de rendimiento.
+- Badge visible de rendimiento en chat (`ms` + resultado de QA) y cache-busting de assets por version.
+
+### Changed
+- Refactor del backend de chat para eliminar duplicacion entre `/api/chat` y `/api/chat/quality` con pipeline unificado.
+- Llamadas bloqueantes (Ollama, web search, web knowledge) movidas a threadpool para reducir cuelgues por bloqueo del event loop.
+- `quality_auto_repair` queda desactivado por defecto para evitar segunda inferencia innecesaria y mejorar latencia.
+
+### Fixed
+- Respuestas que quedaban "colgadas" por cadena de inferencias secuenciales y operaciones bloqueantes dentro de endpoints async.
+- Falla de runtime por dependencia faltante de formularios: se incorpora `python-multipart` en metadata y requirements.
+
 ## [0.10.1] - 2026-03-30 🎨 Chat UX & Branding Polish Release
 ### Added
 - Envio rapido de chat con `Enter` (y `Shift+Enter` para salto de linea).

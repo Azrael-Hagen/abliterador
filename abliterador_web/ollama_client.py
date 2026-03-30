@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import Any
 
 import requests
@@ -48,3 +49,36 @@ class OllamaClient:
         data = response.json()
         msg = data.get("message", {})
         return str(msg.get("content", "")).strip()
+
+    def chat_stream(self, model: str, messages: list[dict[str, Any]], timeout_s: int = 120):
+        url = f"{self.base_url}/api/chat"
+        payload = {
+            "model": model,
+            "stream": True,
+            "messages": messages,
+        }
+
+        with self._session.post(url, json=payload, timeout=timeout_s, stream=True) as response:
+            response.raise_for_status()
+            for raw_line in response.iter_lines(decode_unicode=True):
+                line = (raw_line or "").strip()
+                if not line:
+                    continue
+                try:
+                    row = json.loads(line)
+                except Exception:
+                    continue
+
+                msg = row.get("message", {}) if isinstance(row, dict) else {}
+                delta = str(msg.get("content", ""))
+                done = bool(row.get("done", False)) if isinstance(row, dict) else False
+
+                chunk: dict[str, Any] = {
+                    "delta": delta,
+                    "done": done,
+                }
+                if done:
+                    chunk["total_duration"] = row.get("total_duration")
+                    chunk["eval_count"] = row.get("eval_count")
+                    chunk["eval_duration"] = row.get("eval_duration")
+                yield chunk

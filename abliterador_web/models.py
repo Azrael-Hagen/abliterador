@@ -83,6 +83,9 @@ class ChatRequest(BaseModel):
     web_query: str = Field(default="", max_length=300)
     web_results_limit: int = Field(default=3, ge=1, le=10)
     use_recent_web_knowledge: bool = True
+    quality_check_enabled: bool = True
+    chat_timeout_s: int = Field(default=75, ge=10, le=240)
+    quality_auto_repair: bool = False
 
 
 class ChatResponse(BaseModel):

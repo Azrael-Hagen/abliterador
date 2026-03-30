@@ -153,3 +153,16 @@ Acceptance Criteria:
 - [x] Validación técnica completa (tests + smoke de endpoints).
 Status: [x]
 Notes: UI web unificada con modelo global persistente, catálogo guiado de descargas, transferencias dedicadas y guardrail de coherencia con reintento ligero; validado con `python -m pytest -q` (38 tests en verde) y compilación de módulos web.
+
+---
+
+## CP-12: Chat Streaming y Rendimiento End-to-End
+Milestone: El chat web responde token a token con menor percepción de bloqueo y sin redundancia en backend.
+Acceptance Criteria:
+- [x] Endpoint `POST /api/chat/stream` operativo con eventos NDJSON (token/tool/quality/done).
+- [x] Pipeline de chat unificado para evitar duplicación entre `/api/chat` y `/api/chat/quality`.
+- [x] Llamadas bloqueantes (`ollama`, `web_search`, `web_knowledge`) movidas a threadpool.
+- [x] Timeout de chat configurable y cancelación cliente automática por modo de rendimiento.
+- [x] Pruebas unitarias existentes en verde y smoke real de streaming validado.
+Status: [x]
+Notes: Se corrigió cuelgue percibido por inferencias secuenciales y bloqueo de event loop; UI ahora muestra métrica de chat (ms + QA).
