@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.10.0] - 2026-03-30 🎨 UX Unificada Web Release
+### Added
+- **Modelo global unificado en UI web**: selección única aplicada a todo el flujo de chat y paneles.
+- **Modelo visible en cada respuesta**: el backend ahora reporta `model_used` y el frontend lo muestra en cada salida IA.
+- **Catálogo guiado de modelos descargables**: endpoint `/api/models/download-catalog` + UI con descarga directa sin requerir escritura manual del nombre.
+- **Transferencias web dedicadas**: endpoints `/api/files/manager/upload` y `/api/files/manager/download` con área visible de transferencias en UI.
+- **Branding web aplicado**: logo de proyecto incorporado en cabecera de la interfaz web.
+
+### Changed
+- Refactor de frontend para eliminar lógica redundante y centralizar estado de sesión/modelo/archivos.
+- Flujo de chat con estados visibles por etapas (preparación, generación, validación, completado).
+- `ChatResponse` extendido con campos `model_used`, `quality_score` y `quality_summary`.
+- Mini IA de calidad mejorada con un reintento ligero de refinamiento cuando la respuesta cae bajo umbral.
+- Versión del proyecto incrementada a `0.10.0`.
+
+### Fixed
+- Reducción de duplicación en listeners y sincronización de selectores de modelo.
+- Mejor control de presión sobre el servidor con caché y ajustes de rendimiento del lado cliente.
+
 ## [0.9.0] - 2026-03-30 🎨 UX Overhaul & Chat Quality Release
 ### Added
 - **Chat Quality Assistant**: Motor ligero para detectar respuestas sin coherencia, repetidas o sin sentido (heurísticas, sin extra LLM).

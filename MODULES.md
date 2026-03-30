@@ -96,7 +96,15 @@
 
 24. FileManager
 - Purpose: Gestión completa de archivos del workspace con seguridad (protección traverse, operaciones copy/move/delete, preview, búsqueda).
-- Public API: list_files(), get_preview(), copy_file(), move_file(), delete_file(), create_folder(), search().
+- Public API: list_files(), get_preview(), copy_file(), move_file(), delete_file(), create_folder(), search(), write_bytes(), get_download_path().
+
+25. Download Catalog Seed
+- Purpose: Catálogo curado de modelos sugeridos para descarga directa desde la web admin.
+- Public API: _download_catalog_seed() + endpoint /api/models/download-catalog.
+
+26. Unified Web UI State
+- Purpose: Estado centralizado de sesión/modelo/rendimiento/archivos para evitar lógica redundante en frontend.
+- Public API: setActiveModel(), loadModels(), loadFileList(), sendChat(), loadDownloadCatalog().
 
 ## Reuse Rules
 - Any new long-running operation must be routed through ModelTaskWorker.

@@ -10,8 +10,23 @@
   <div class="bg-grid"></div>
   <main class="layout">
     <aside class="panel side">
-      <h1>{{ app_name }}</h1>
-      <p class="muted">Servidor remoto multiusuario</p>
+      <header class="brand">
+        <img src="/assets/Copilot_20260327_161839.png" alt="Logo Abliterador" class="brand-logo" />
+        <div>
+          <h1>{{ app_name }}</h1>
+          <p class="muted">Servidor remoto multiusuario</p>
+        </div>
+      </header>
+
+      <section class="block">
+        <h2>Modelo Global</h2>
+        <select id="modelSelectMain"></select>
+        <div class="row-actions">
+          <button id="btnModels">Refrescar modelos</button>
+          <span id="activeModelBadge" class="badge">Sin modelo</span>
+        </div>
+      </section>
+
       <div class="tabbar" id="tabbar">
         <button class="tab active" data-tab="operacion">Operacion</button>
         <button class="tab" data-tab="chat">Chat IA</button>
@@ -38,56 +53,52 @@
         </section>
 
         <section class="block">
-          <h2>Modelo</h2>
-          <select id="modelSelect"></select>
-          <button id="btnModels">Refrescar modelos</button>
-        </section>
-
-        <section class="block">
-          <h2>Sandbox</h2>
-          <p class="muted small">Directorios permitidos:</p>
-          <ul>
-            {% for item in allowed_dirs %}
-            <li>{{ item }}</li>
-            {% endfor %}
-          </ul>
-          <label class="toggle"><input id="useTools" type="checkbox" /> Permitir file tools por IA</label>
-          <label class="toggle"><input id="useWebSearch" type="checkbox" checked /> Enriquecer chat con busqueda web</label>
-          <label class="toggle"><input id="useRecentWebKnowledge" type="checkbox" checked /> Usar memoria web reciente del servidor</label>
-          <input id="webQuery" placeholder="Query web opcional (si vacio usa tu prompt)" />
-          <input id="webResultsLimit" type="number" min="1" max="10" value="3" />
+          <h2>Rendimiento Cliente</h2>
+          <select id="perfMode">
+            <option value="balanced">Balanceado (recomendado)</option>
+            <option value="eco">Eco (menos polling servidor)</option>
+            <option value="fast">Rapido (mas refresco visual)</option>
+          </select>
+          <p class="muted small">Ajusta refrescos y cache local para mantener UX fluida sin saturar servidor.</p>
         </section>
       </section>
 
       <section class="tab-pane" data-pane="chat">
         <section class="block">
-          <h2>Seleccionar Modelo</h2>
-          <p class="muted small">Modelos disponibles:</p>
-          <select id="modelSelectChat"></select>
-          <button id="btnRefreshModelsChat">Actualizar</button>
-        </section>
-        <section class="block">
-          <h2>Opciones de Enriquecimiento</h2>
-          <label class="toggle"><input id="useQualityCheck" type="checkbox" checked /> Verificar calidad de respuesta</label>
+          <h2>Flujo del Chat</h2>
+          <label class="toggle"><input id="useQualityCheck" type="checkbox" checked /> Mini IA de coherencia</label>
           <label class="toggle"><input id="useToolsChat" type="checkbox" /> Permitir file tools</label>
-          <label class="toggle"><input id="useWebSearchChat" type="checkbox" checked /> Enriquecer con búsqueda web</label>
-          <label class="toggle"><input id="useWebKnowledgeChat" type="checkbox" checked /> Usar memoria web reciente</label>
+          <label class="toggle"><input id="useWebSearchChat" type="checkbox" checked /> Enriquecer con busqueda web</label>
+          <label class="toggle"><input id="useWebKnowledgeChat" type="checkbox" checked /> Memoria web reciente</label>
           <input id="webQueryChat" placeholder="Query web (opcional)" />
           <input id="webResultsLimitChat" type="number" min="1" max="10" value="3" />
+          <button id="btnRefreshModelsChat">Sincronizar vista</button>
         </section>
       </section>
 
       <section class="tab-pane" data-pane="archivos">
         <section class="block">
           <h2>Gestor de Archivos</h2>
-          <p class="muted small">Interfaz OneDrive-like para tu workspace</p>
-          <div id="fileBrowser" style="border: 1px solid #444; padding: 10px; border-radius: 4px; max-height: 400px; overflow-y: auto; margin: 10px 0;">
+          <div id="fileBrowser" class="file-browser">
             <p id="fileListStatus" class="muted small">Conectando...</p>
             <div id="fileList"></div>
           </div>
-          <input id="searchFiles" placeholder="Buscar archivos..." />
-          <button id="btnSearchFiles">Buscar</button>
+          <div class="row-actions">
+            <input id="searchFiles" placeholder="Buscar archivos..." />
+            <button id="btnSearchFiles">Buscar</button>
+          </div>
           <button id="btnNewFolder">Nueva carpeta</button>
+        </section>
+
+        <section class="block">
+          <h2>Transferencias</h2>
+          <input id="uploadTargetPath" placeholder="Ruta destino (opcional, ej: docs/)" />
+          <input id="uploadFileInput" type="file" />
+          <div class="row-actions">
+            <button id="btnUploadFile">Subir archivo</button>
+            <button id="btnDownloadSelected">Descargar seleccionado</button>
+          </div>
+          <div id="transferQueue" class="transfer-queue muted small"></div>
         </section>
       </section>
 
@@ -116,9 +127,11 @@
           <button id="btnApplyUserEdit">Aplicar cambios usuario</button>
           <button id="btnDeleteUser" class="danger">Eliminar usuario</button>
 
-          <h2>Modelos en servidor</h2>
-          <input id="pullModelName" placeholder="Modelo para descargar (ej: qwen2.5:7b)" />
-          <button id="btnPullModel">Solicitar descarga modelo</button>
+          <h2>Modelos para Descargar</h2>
+          <button id="btnRefreshDownloadCatalog">Refrescar catalogo recomendado</button>
+          <div id="downloadCatalog" class="download-catalog"></div>
+          <input id="pullModelName" placeholder="O modelo manual (ej: qwen2.5:7b)" />
+          <button id="btnPullModel">Descargar modelo manual</button>
           <p id="pullStatus" class="muted small"></p>
 
           <h2>Desktop</h2>
@@ -153,7 +166,6 @@
 
         <section class="block">
           <h2>Acceso LAN</h2>
-          <p class="muted small">URLs detectadas:</p>
           <ul id="serverUrls">
             {% for item in server_urls %}
             <li>{{ item }}</li>
@@ -164,19 +176,12 @@
         <section class="block">
           <h2>FTP LAN</h2>
           {% if ftp_enabled %}
-          <p class="muted small">Servidor FTP activo (subida/descarga):</p>
           <ul id="ftpUrls">
             {% for item in ftp_urls %}
             <li>{{ item }}</li>
             {% endfor %}
           </ul>
           <p class="muted small">Raiz FTP: {{ ftp_root }}</p>
-          <p class="muted small">Bibliotecas detectadas:</p>
-          <ul>
-            {% for item in ftp_libraries %}
-            <li>{{ item }}</li>
-            {% endfor %}
-          </ul>
           {% else %}
           <p class="muted small">FTP deshabilitado por configuracion.</p>
           {% endif %}
@@ -186,19 +191,16 @@
 
     <section class="panel chat">
       <div class="status-strip" id="statusStrip">Listo para iniciar sesion.</div>
-      <div style="display: flex; gap: 10px; padding: 10px; background: #1a1a1a; border-bottom: 1px solid #333;">
-        <div style="flex: 1;">
-          <small class="muted">Modelo:</small>
-          <select id="modelSelectMain" style="width: 100%;"></select>
-        </div>
-        <div id="progressIndicator" style="flex: 0.3; display: flex; align-items: center; justify-content: center; gap: 5px;">
-          <div id="spinner" style="display: none; width: 16px; height: 16px; border: 2px solid #666; border-top: 2px solid #00d4ff; border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
+      <div class="chat-toolbar">
+        <span id="chatModelBadge" class="badge">Modelo: -</span>
+        <div id="progressIndicator" class="progress-inline">
+          <div id="spinner" class="spinner"></div>
           <small id="progressText" class="muted">Listo</small>
         </div>
       </div>
       <div id="log" class="log"></div>
       <div class="composer">
-        <textarea id="prompt" placeholder="Escribe tu pregunta o comando... (usa /help para ver comandos)"></textarea>
+        <textarea id="prompt" placeholder="Escribe tu pregunta o comando..."></textarea>
         <button id="btnSend">Enviar</button>
       </div>
     </section>

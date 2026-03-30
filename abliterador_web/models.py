@@ -59,6 +59,18 @@ class ModelPullJobResponse(BaseModel):
     output_tail: str = ""
 
 
+class DownloadCatalogModel(BaseModel):
+    name: str
+    description: str = ""
+    size_hint: str = ""
+    category: str = "general"
+    installed: bool = False
+
+
+class DownloadCatalogResponse(BaseModel):
+    models: list[DownloadCatalogModel] = Field(default_factory=list)
+
+
 class DiagnosticsRepairRequest(BaseModel):
     actions: list[str] = Field(default_factory=list)
 
@@ -76,6 +88,9 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     reply: str
     tool_events: list[str] = Field(default_factory=list)
+    model_used: str = ""
+    quality_score: float | None = None
+    quality_summary: str | None = None
 
 
 class WebSearchRequest(BaseModel):

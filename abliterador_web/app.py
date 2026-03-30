@@ -10,8 +10,8 @@ import uuid
 from typing import Any
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, Request, UploadFile
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -22,6 +22,8 @@ from abliterador_web.file_manager import FileManager
 from abliterador_web.models import (
     ChatRequest,
     ChatResponse,
+    DownloadCatalogResponse,
+    DownloadCatalogModel,
     DiagnosticsRepairRequest,
     FileDeleteRequest,
     FileListRequest,
@@ -241,6 +243,18 @@ def _format_web_context(results: list[dict[str, str]], max_chars: int = 2200) ->
     return "\n".join(lines)
 
 
+def _download_catalog_seed() -> list[DownloadCatalogModel]:
+    return [
+        DownloadCatalogModel(name="qwen2.5:0.5b", description="Ligero para pruebas rápidas.", size_hint="0.5B", category="ligero"),
+        DownloadCatalogModel(name="qwen2.5:1.5b", description="Equilibrio calidad/velocidad para uso general.", size_hint="1.5B", category="general"),
+        DownloadCatalogModel(name="llama3.2:3b", description="Conversación general en español e inglés.", size_hint="3B", category="general"),
+        DownloadCatalogModel(name="gemma2:2b", description="Modelo compacto para servidores con recursos ajustados.", size_hint="2B", category="ligero"),
+        DownloadCatalogModel(name="phi4:mini", description="Razonamiento eficiente para tareas técnicas.", size_hint="mini", category="tecnico"),
+        DownloadCatalogModel(name="qwen2.5-coder:3b", description="Asistencia de código y debugging diario.", size_hint="3B", category="codigo"),
+        DownloadCatalogModel(name="deepseek-r1:7b", description="Razonamiento avanzado (latencia mayor).", size_hint="7B", category="razonamiento"),
+    ]
+
+
 def create_app() -> FastAPI:
     settings = load_settings()
     auth = TokenAuth(secret=settings.secret)
@@ -266,10 +280,12 @@ def create_app() -> FastAPI:
     server_urls = [item.url for item in detect_server_addresses(settings.port)]
     ftp_access_urls = ftp_urls(settings.ftp_port) if settings.ftp_enabled else []
 
-    app = FastAPI(title="Abliterador Web Server", version="0.9.0")
+    app = FastAPI(title="Abliterador Web Server", version="0.10.0")
     module_dir = Path(__file__).resolve().parent
+    repo_root = module_dir.parent
     templates = Jinja2Templates(directory=str(module_dir / "templates"))
     app.mount("/static", StaticFiles(directory=str(module_dir / "static")), name="static")
+    app.mount("/assets", StaticFiles(directory=str(repo_root / "sources")), name="assets")
 
     @app.middleware("http")
     async def local_network_guard(request: Request, call_next):
@@ -429,6 +445,26 @@ def create_app() -> FastAPI:
             return {"models": models_cache.get_or_load(ollama.list_models)}
         except Exception as exc:
             raise HTTPException(status_code=503, detail=f"No se pudo consultar Ollama: {exc}") from exc
+
+    @app.get("/api/models/download-catalog", response_model=DownloadCatalogResponse)
+    async def models_download_catalog(_user: AuthUser = Depends(require_permission("manage_models"))):
+        seed = _download_catalog_seed()
+        try:
+            installed = set(models_cache.get_or_load(ollama.list_models))
+        except Exception:
+            installed = set()
+        rows: list[DownloadCatalogModel] = []
+        for item in seed:
+            rows.append(
+                DownloadCatalogModel(
+                    name=item.name,
+                    description=item.description,
+                    size_hint=item.size_hint,
+                    category=item.category,
+                    installed=item.name in installed,
+                )
+            )
+        return DownloadCatalogResponse(models=rows)
 
     @app.post("/api/admin/models/pull", response_model=ModelPullJobResponse)
     async def model_pull(
@@ -600,13 +636,13 @@ def create_app() -> FastAPI:
                     messages.append({"role": "assistant", "content": reply})
                     messages.append({"role": "tool", "content": result})
                     follow_up = ollama.chat(model=payload.model, messages=messages)
-                    return ChatResponse(reply=follow_up, tool_events=tool_events)
+                    return ChatResponse(reply=follow_up, tool_events=tool_events, model_used=payload.model)
                 except SandboxError as exc:
                     tool_events.append(f"tool rechazada por sandbox: {exc}")
                 except Exception as exc:
                     tool_events.append(f"tool error: {exc}")
 
-        return ChatResponse(reply=reply, tool_events=tool_events)
+        return ChatResponse(reply=reply, tool_events=tool_events, model_used=payload.model)
 
     @app.post("/api/files/list")
     async def files_list(payload: FileListRequest, user: AuthUser = Depends(require_permission("files"))):
@@ -757,6 +793,46 @@ def create_app() -> FastAPI:
         except Exception as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    @app.post("/api/files/manager/upload")
+    async def files_manager_upload(
+        file: UploadFile = File(...),
+        path: str = Form(default=""),
+        user: AuthUser = Depends(require_permission("files")),
+    ):
+        """Upload file into user workspace."""
+        fm = user_file_manager(user)
+        try:
+            filename = Path(file.filename or "archivo_subido.bin").name
+            target = f"{path.strip().strip('/')}/{filename}".strip("/")
+            data = await file.read()
+            if len(data) > 40 * 1024 * 1024:
+                raise HTTPException(status_code=413, detail="Archivo demasiado grande (max 40MB)")
+            saved = fm.write_bytes(target, data)
+            return {"path": saved, "size_bytes": len(data), "filename": filename}
+        except HTTPException:
+            raise
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.get("/api/files/manager/download")
+    async def files_manager_download(
+        path: str = Query(..., min_length=1, max_length=300),
+        user: AuthUser = Depends(require_permission("files")),
+    ):
+        """Download file from user workspace."""
+        fm = user_file_manager(user)
+        try:
+            target = fm.get_download_path(path)
+            return FileResponse(
+                path=str(target),
+                filename=target.name,
+                media_type="application/octet-stream",
+            )
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=f"Archivo no encontrado: {path}") from exc
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     @app.post("/api/files/manager/search")
     async def files_manager_search(
         payload: dict,
@@ -787,7 +863,7 @@ def create_app() -> FastAPI:
 
     # ===== Chat with Quality Checking =====
 
-    @app.post("/api/chat/quality")
+    @app.post("/api/chat/quality", response_model=ChatResponse)
     async def chat_with_quality(
         payload: ChatRequest,
         user: AuthUser = Depends(require_permission("chat")),
@@ -838,9 +914,31 @@ def create_app() -> FastAPI:
 
         # Quality check
         quality_score = chat_quality_checker.check_response(reply, payload.message)
-        tool_events.append(f"quality_score: {quality_score.score:.0%} - {chat_quality_checker.get_quality_summary(quality_score)}")
+        quality_summary = chat_quality_checker.get_quality_summary(quality_score)
+        tool_events.append(f"quality_score: {quality_score.score:.0%} - {quality_summary}")
         if quality_score.issues:
             tool_events.extend([f"quality_issue: {issue}" for issue in quality_score.issues])
+
+        # Lightweight guardrail: one repair pass only when quality is low.
+        if not quality_score.is_acceptable:
+            try:
+                messages.append({
+                    "role": "system",
+                    "content": (
+                        "Reformula tu respuesta para que sea clara, concreta y coherente con la pregunta. "
+                        "Evita relleno, repeticiones y texto sin sentido."
+                    ),
+                })
+                messages.append({"role": "assistant", "content": reply})
+                repaired = ollama.chat(model=payload.model, messages=messages)
+                repaired_score = chat_quality_checker.check_response(repaired, payload.message)
+                if repaired_score.score >= quality_score.score:
+                    reply = repaired
+                    quality_score = repaired_score
+                    quality_summary = chat_quality_checker.get_quality_summary(quality_score)
+                    tool_events.append("quality_autofix: respuesta refinada por mini-ia")
+            except Exception as exc:
+                tool_events.append(f"quality_autofix_error: {exc}")
 
         if payload.use_file_tools:
             tool_call = _extract_tool_call(reply)
@@ -868,13 +966,25 @@ def create_app() -> FastAPI:
                     messages.append({"role": "assistant", "content": reply})
                     messages.append({"role": "tool", "content": result})
                     follow_up = ollama.chat(model=payload.model, messages=messages)
-                    return ChatResponse(reply=follow_up, tool_events=tool_events)
+                    return ChatResponse(
+                        reply=follow_up,
+                        tool_events=tool_events,
+                        model_used=payload.model,
+                        quality_score=quality_score.score,
+                        quality_summary=quality_summary,
+                    )
                 except SandboxError as exc:
                     tool_events.append(f"tool rechazada por sandbox: {exc}")
                 except Exception as exc:
                     tool_events.append(f"tool error: {exc}")
 
-        return ChatResponse(reply=reply, tool_events=tool_events)
+        return ChatResponse(
+            reply=reply,
+            tool_events=tool_events,
+            model_used=payload.model,
+            quality_score=quality_score.score,
+            quality_summary=quality_summary,
+        )
 
     @app.get("/api/health")
     async def health():

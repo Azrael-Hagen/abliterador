@@ -138,3 +138,18 @@ Acceptance Criteria:
 - [x] Todos los 38 tests de suite en verde sin regresiones.
 Status: [x]
 Notes: Implementación modular de ChatQualityChecker y FileManager como servicios reutilizables. UI restructurada con tabs en sidebar y mejor organización. Progreso visual mejorado aunque sin streaming real (deferido a v1.0). Performance sin degradación significativa (<100ms para quality check).
+
+---
+
+## CP-11: UX Unificada, Catálogo Guiado y Transferencias Web
+Milestone: UI web más intuitiva con modelo global único, catálogo de descarga visible, transferencias dedicadas y guardrails ligeros de coherencia.
+Acceptance Criteria:
+- [x] Selección de modelo única y sincronizada en toda la UI.
+- [x] Cada respuesta de chat muestra explícitamente el modelo usado.
+- [x] Catálogo de modelos descargables visible en UI con acción directa sin entrada manual obligatoria.
+- [x] Zona de transferencias upload/download visible y funcional en el gestor web.
+- [x] Flujo de estado del chat visible por etapas antes de la respuesta final.
+- [x] Redundancias de UI eliminadas y carga cliente configurable para reducir presión en servidor.
+- [x] Validación técnica completa (tests + smoke de endpoints).
+Status: [x]
+Notes: UI web unificada con modelo global persistente, catálogo guiado de descargas, transferencias dedicadas y guardrail de coherencia con reintento ligero; validado con `python -m pytest -q` (38 tests en verde) y compilación de módulos web.

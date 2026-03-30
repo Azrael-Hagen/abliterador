@@ -272,6 +272,23 @@ class FileManager:
 
         return sorted(results, key=lambda x: x.modified_at, reverse=True)
 
+    def write_bytes(self, path: str, content: bytes) -> str:
+        """Write binary content to a relative path in the workspace."""
+        target = self._resolve_safe(path)
+        if target == self.root:
+            raise ValueError("Invalid target path")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with open(target, "wb") as out:
+            out.write(content)
+        return str(target.relative_to(self.root)).replace("\\", "/")
+
+    def get_download_path(self, path: str) -> Path:
+        """Resolve a file path for download with workspace boundary validation."""
+        target = self._resolve_safe(path)
+        if not target.exists() or not target.is_file():
+            raise FileNotFoundError(path)
+        return target
+
     @staticmethod
     def _format_size(bytes_size: int) -> str:
         """Format byte size as human-readable string."""

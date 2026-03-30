@@ -1,5 +1,26 @@
 # Engineer Log
 
+## [CP-11] 2026-03-30
+Status: Passed
+Decisions made:
+- Se unificó el estado de modelo en frontend para que la selección se aplique a toda la UI y quede persistida en cliente.
+- Se añadió catálogo guiado de modelos descargables en backend (`/api/models/download-catalog`) y UI admin con descarga directa.
+- Se añadieron endpoints dedicados de transferencia (`/api/files/manager/upload` y `/api/files/manager/download`) para experiencia tipo nube local.
+- Se extendió `ChatResponse` con `model_used`, `quality_score` y `quality_summary` para trazabilidad y control de calidad visibles.
+- Se aplicó logo del proyecto a la UI web montando assets desde `sources/`.
+
+Trade-offs:
+- El catálogo de descarga es curado (seed estático + estado instalado) para mantener baja latencia y cero dependencia externa.
+- La guardia de calidad usa un único reintento de refinamiento (sin segundo modelo) para no penalizar rendimiento.
+
+Debt deferred:
+- Añadir streaming token-by-token (SSE/WebSocket) para progreso aún más granular.
+- Expandir catálogo descargable con ranking dinámico por hardware/telemetría local.
+
+Next steps:
+- Ejecutar smoke E2E con servidor levantado + login + descarga de modelo desde catálogo + upload/download de archivo.
+- Integrar métricas de frontend (INP/LCP local) para vigilar regresiones de rendimiento percibido.
+
 ## [CP-10] 2026-03-30  
 Status: Passed
 Decisions made:
